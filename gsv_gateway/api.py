@@ -76,20 +76,24 @@ class Boundary:
         scope.setdefault("state", {})["request_id"] = request_id
         headers = scope.get("headers", [])
         auth = [value for key, value in headers if key.lower() == b"authorization"]
-        token = getattr(self.service, "token", "")
+        tokens = self.service.tokens
         reason = None
         if not auth:
             reason = "missing_authorization"
         elif len(auth) > 1:
             reason = "multiple_authorization"
-        elif not token:
+        elif not tokens:
             reason = "token_unavailable"
         else:
             scheme, separator, credential = auth[0].partition(b" ")
             if scheme.lower() != b"bearer" or not separator:
                 reason = "invalid_bearer_format"
-            elif not hmac.compare_digest(credential, token.encode("utf-8")):
-                reason = "token_mismatch"
+            else:
+                matched = False
+                for token in tokens:
+                    matched |= hmac.compare_digest(credential, token)
+                if not matched:
+                    reason = "token_mismatch"
         if reason:
             now = asyncio.get_running_loop().time()
             if now - self.last_auth_log.get(reason, -math.inf) >= 5:

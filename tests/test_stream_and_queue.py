@@ -31,7 +31,7 @@ class ASGIRequest:
             "client": ("127.0.0.1", 1234),
             "root_path": "",
             "headers": [
-                (b"authorization", ("Bearer " + self.service.token).encode()),
+                (b"authorization", b"Bearer " + self.service.tokens[0]),
                 (b"content-type", b"application/json"),
             ],
         }

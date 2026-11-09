@@ -186,14 +186,14 @@ async def diagnose(path, overrides=None, runtime_root=None, full=True):
         files={"gateway": str(config.path), "voices": str(config.voices_path)},
     )
     try:
-        config.read_token()
-        row("TOKEN", "OK", "Private token file valid")
-    except Exception:
+        tokens = config.read_tokens()
+        row("TOKEN", "OK", "Private token file valid", enabled_count=len(tokens))
+    except ValueError as error:
         row(
             "TOKEN",
             "ERROR",
-            "Token file missing, invalid or permissions too broad",
-            next_action="scripts/setup.ps1 -InitConfig",
+            str(error),
+            next_action="Check auth.token_file and the private api-tokens.jsonc configuration",
         )
     adapter = create_adapter(config)
     try:

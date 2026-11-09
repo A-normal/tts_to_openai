@@ -13,7 +13,7 @@ powershell.exe -NoProfile -File .\gateway.ps1 check-config --config .\config\gat
 ## 启动和转发
 
 1. 使用 `run` 或 `start` 启动。确认网关在完成 FLAC 合成和解码自检后显示 `ready`，再用 `status --json` 确认就绪。失败时查看命令错误和 `logging.directory` 下的 `startup.log`。
-2. 在部署地址以正确 Token 请求 `/v1/models` 和 `/v1/audio/speech`，确认模型 ID、目标音频格式和完整播放。分别检查各注册声音的音色和参考音频匹配情况。
+2. 在部署地址以正确 Token 请求 `/v1/models` 和 `/v1/audio/speech`，确认模型 ID、目标音频格式和完整播放。使用两条启用凭据分别请求 `/v1/models`，再将其中一条设为 `enabled: false`。通过 `check-config` 后重启，确认停用凭据返回 401，另一条凭据仍可使用。分别检查各注册声音的音色和参考音频匹配情况。
 3. 通过转发入口重复请求，验证 `Authorization` 透传、错误 Token 返回 401，以及长音频可以持续接收。若 401 由网关返回，用 `X-Request-ID` 查私有日志。
 4. 若部署使用后台模式，验证 `start`、`restart`、`stop` 和关闭终端后的运行状态。若由网关管理 GSV，在独立测试环境验证受管后端异常退出后的恢复和进程清理。使用不同 Windows 会话或账户的部署也应在目标账户下验收。
 

@@ -19,8 +19,9 @@ from .windows import ManagedProcess, Mutex
 
 
 class GatewayService:
-    def __init__(self, config, adapter=None):
+    def __init__(self, config, adapter=None, *, tokens: tuple[bytes, ...] = ()):
         self.config = config
+        self.tokens = tokens
         self.adapter = adapter or create_adapter(config)
         self.state = "starting"
         self.backend_process = None
@@ -83,7 +84,8 @@ class GatewayService:
         startup["phase"] = "startup_logging"
         secure_path(self.config.state_dir, directory=True)
         self.configure_logs()
-        self.token = self.config.read_token()
+        if not self.tokens:
+            self.tokens = self.config.read_tokens()
         if not self.mutexes:
             self.reserve()
         async with asyncio.timeout_at(deadline):

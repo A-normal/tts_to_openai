@@ -5,7 +5,16 @@ import wave
 from pathlib import Path
 from typing import Literal, get_args, get_origin
 
-from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, StrictStr, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StrictBool,
+    StrictInt,
+    StrictStr,
+    ValidationError,
+    model_validator,
+)
 
 from . import jsonc
 
@@ -42,7 +51,17 @@ class Server(Model):
 
 
 class Auth(Model):
-    token_file: StrictStr = "secrets/api-token.txt"
+    token_file: StrictStr = "secrets/api-tokens.jsonc"
+
+
+class TokenEntry(Model):
+    id: StrictStr = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
+    token: StrictStr = Field(min_length=43, max_length=512, pattern=r"^[A-Za-z0-9._~+/\-]+=*$")
+    enabled: StrictBool
+
+
+class TokenFile(Model):
+    tokens: list[TokenEntry] = Field(min_length=1, max_length=128)
 
 
 class Auto(Model):
@@ -285,14 +304,38 @@ class LoadedConfig:
     def resolve(self, value: str) -> Path:
         return resolve_path(self.base, value)
 
-    def read_token(self) -> str:
+    def read_tokens(self) -> tuple[bytes, ...]:
         from .security import require_private
 
-        require_private(self.token_path)
-        token = self.token_path.read_text(encoding="utf-8-sig").strip()
-        if not token or any(c.isspace() for c in token) or len(token) < 43:
-            raise ValueError("Token file must contain a single unpredictable token of at least 43 characters")
-        return token
+        if self.token_path.suffix.lower() != ".jsonc":
+            raise ValueError("auth.token_file must point to a private .jsonc token file")
+        try:
+            require_private(self.token_path)
+        except Exception:
+            raise ValueError("Token file missing or permissions could not be verified") from None
+        try:
+            raw = jsonc.load(self.token_path)
+        except (OSError, ValueError, RecursionError):
+            raise ValueError("Token file is unreadable or contains invalid JSONC") from None
+        try:
+            entries = TokenFile.model_validate(raw).tokens
+        except ValidationError as exc:
+            location = exc.errors(include_input=False)[0]["loc"]
+            if len(location) >= 2 and location[0] == "tokens" and isinstance(location[1], int):
+                raise ValueError(f"Invalid token entry #{location[1] + 1}: check id, token and enabled") from None
+            raise ValueError("Token file must contain a tokens array with 1 to 128 entries") from None
+
+        ids, values, active = set(), set(), []
+        for number, entry in enumerate(entries, 1):
+            if entry.id in ids or entry.token in values:
+                raise ValueError(f"Duplicate token ID or value at entry #{number}")
+            ids.add(entry.id)
+            values.add(entry.token)
+            if entry.enabled:
+                active.append(entry.token.encode("ascii"))
+        if not active:
+            raise ValueError("At least one token must be enabled")
+        return tuple(active)
 
     def assert_registry_unchanged(self):
         if fingerprint(self.voices_path) != self.registry_digest:

@@ -11,7 +11,7 @@ async def client(service):
     async with httpx.AsyncClient(
         transport=httpx.ASGITransport(app=create_app(service)),
         base_url="http://test",
-        headers={"Authorization": "Bearer " + service.token},
+        headers={"Authorization": "Bearer " + service.tokens[0].decode("ascii")},
     ) as client:
         yield client
 
@@ -131,5 +131,7 @@ async def test_large_numeric_speed_and_invalid_unicode_are_400(client):
 
 
 async def test_auth_scheme_is_case_insensitive(client, service):
-    response = await client.get("/v1/models", headers={"Authorization": "bearer " + service.token})
+    response = await client.get(
+        "/v1/models", headers={"Authorization": "bearer " + service.tokens[0].decode("ascii")}
+    )
     assert response.status_code == 200

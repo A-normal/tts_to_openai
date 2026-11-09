@@ -47,7 +47,7 @@ async def main():
     raw["server"]["port"] = free_port()
     config_path.write_text(json.dumps(raw, ensure_ascii=False, indent=2), encoding="utf-8")
     config = LoadedConfig(config_path, runtime_root=original.runtime_root)
-    token = config.read_token()
+    token = config.read_tokens()[0].decode("ascii")
     url = f"http://127.0.0.1:{config.value.server.port}"
     task = asyncio.create_task(run(config))
     proxy_task = None

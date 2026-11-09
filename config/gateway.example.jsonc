@@ -18,8 +18,8 @@
   },
   // 服务级鉴权，始终开启；不能用 URL query 传密钥。
   "auth": {
-    // 单行私有 Token 文件；至少 32 个安全随机字节生成。setup -InitConfig 可生成，修改后重启。 默认值："secrets/api-token.txt"。
-    "token_file": "secrets/api-token.txt"
+    // 私有 JSONC 凭据列表；每项包含 id、token 和 enabled。setup -InitConfig 可生成，修改后重启。 默认值："secrets/api-tokens.jsonc"。
+    "token_file": "secrets/api-tokens.jsonc"
   },
   // 声音注册表文件；相对路径以本文件目录为基准。 默认值："voices.jsonc"。
   "voices_file": "voices.jsonc",

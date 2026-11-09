@@ -142,8 +142,11 @@ class FakeAdapter:
 def config(tmp_path):
     token_dir = tmp_path / "secrets"
     secure_path(token_dir, directory=True)
-    token = token_dir / "token.txt"
-    token.write_text(secrets.token_urlsafe(32))
+    token = token_dir / "api-tokens.jsonc"
+    token.write_text(
+        json.dumps({"tokens": [{"id": "default", "token": secrets.token_urlsafe(32), "enabled": True}]}),
+        encoding="utf-8",
+    )
     secure_path(token)
     voices = {
         "schema_version": 1,
@@ -163,7 +166,6 @@ def config(tmp_path):
     (tmp_path / "voices.jsonc").write_text(json.dumps(voices), encoding="utf-8")
     data = {
         "schema_version": 1,
-        "auth": {"token_file": "secrets/token.txt"},
         "backend": {"mode": "connect"},
         "startup_test": {"voice": "a"},
         "timeouts": {
@@ -183,9 +185,8 @@ def config(tmp_path):
 @pytest.fixture
 async def service(config):
     adapter = FakeAdapter(config)
-    service = GatewayService(config, adapter)
+    service = GatewayService(config, adapter, tokens=config.read_tokens())
     service.ffmpeg, service.ffprobe = resolve_tools(config)
-    service.token = config.read_token()
     service.state = "ready"
     service.log = lambda *args, **kwargs: None
     service.scheduler.pipeline_factory = foreground_pipeline

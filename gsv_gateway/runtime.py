@@ -18,11 +18,10 @@ async def run(config, nonce=None, *, startup=None):
         startup = {}
     nonce = nonce or uuid.uuid4().hex
     startup["phase"] = "token"
-    token = config.read_token()
+    tokens = config.read_tokens()
     startup["phase"] = "runtime_setup"
-    service = GatewayService(config)
     # Authentication is available while initialization is still in progress.
-    service.token = token
+    service = GatewayService(config, tokens=tokens)
     identity = {
         "pid": os.getpid(),
         "created": current_creation_time(),

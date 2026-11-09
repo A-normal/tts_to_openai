@@ -326,6 +326,7 @@ def main(argv=None):
             asyncio.run(run(config, args.startup_nonce, startup=startup))
             return 0
         if args.command == "restart":
+            config.read_tokens()
             _stop(config, state)
             if state is not None:
                 _progress("Previous gateway stopped.")

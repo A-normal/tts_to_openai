@@ -17,7 +17,7 @@ Windows 本地 GPT-SoVITS 网关，提供 OpenAI Speech 核心协议。固定 `m
 
 PowerShell 入口优先选择兼容的 PATH Python 或由它创建的项目虚拟环境。FFmpeg 和 FFprobe 按「显式配置 → 当前进程 PATH → 项目 runtime」成对选择。完整规则和确认命令见 [运行环境与工具优先级](docs/runtime.md)。
 
-`-InitConfig` 只补齐不存在的 `config/gateway.jsonc`、`config/voices.jsonc` 和随机私有 Token，不覆盖已有配置。请调整声音资产路径。安装成功后仍须通过 doctor 和真实启动自检。
+`-InitConfig` 只补齐缺失的 `config/gateway.jsonc`、`config/voices.jsonc` 和 `config/secrets/api-tokens.jsonc`，并为新建的凭据文件生成一个随机 Token。请调整声音资产路径。安装成功后仍须通过 doctor 和真实启动自检。
 
 项目移动后重新准备环境；修复共享 runtime 前停止全部网关实例，setup 不代为终止进程。失败/中断的安装保留不完整标记，普通启动拒绝使用，显式重跑 setup 修复。
 
@@ -71,9 +71,26 @@ doctor 只需传入主配置，按 `voices_file` 自动读取声音表；无需�
 
 启动身份校验失败、配置在启动期间变更、初始化退出或超时分别报告 `startup_identity_conflict`、`startup_config_changed`、`startup_exited`、`startup_timeout`。`check-config` 通过表示可执行启动测试，仍需真实启动自检成功；`auto` 模式下后端尚未运行可出现 `BACKEND_ENDPOINT` 警告。
 
-## API
+## API 凭据
 
-所有 HTTP 路由均需 Bearer Token，包括健康检查和错误路径。Token 在 `config/secrets/api-token.txt`，不要提交 Git 或放入 URL；更换后重启生效。
+所有 HTTP 路由均需 Bearer Token，包括健康检查和错误路径。`auth.token_file` 默认指向私有的 `secrets/api-tokens.jsonc`。每个客户端发送自己的 `Authorization: Bearer <token>`。不同凭据共享网关权限和队列，分别启停和轮换。
+
+```jsonc
+{
+  "tokens": [
+    // 桌面客户端
+    { "id": "desktop", "token": "<替换为随机 Token A>", "enabled": true },
+    // 测试客户端已停用
+    { "id": "test-client", "token": "<替换为随机 Token B>", "enabled": false }
+  ]
+}
+```
+
+最多配置 128 项，至少一项启用。`id` 和 `token` 各自唯一，包括停用项。`id` 以英文字母或数字开头，最多 64 个字符，其余字符可用字母、数字、点、下划线或连字符。每个 Token 独立生成，使用至少 32 个安全随机字节，例如 `python -c "import secrets; print(secrets.token_urlsafe(32))"`。`enabled` 必须明确填写布尔值。保存后先运行 `check-config`，通过后重启生效。请保持文件 ACL 为私有，避免将凭据提交 Git 或放入 URL。
+
+**从单行 TXT 升级**。在现有私有 `secrets` 目录创建 `api-tokens.jsonc`，将原 Token 值填入一条启用记录，然后把主配置的 `auth.token_file` 改为 `secrets/api-tokens.jsonc`。如果上次通过 CLI 覆盖了 Token 路径，重启时显式更新 `--token-file`。先用 `check-config` 验证，再用客户端原凭据验收。确认迁移完成后即可清理旧 TXT。
+
+## API
 
 排查转发 401 时，可对比本机直连和转发后的 `/v1/models`。网关拒绝时返回 `invalid_api_key` 和 `X-Request-ID`。用请求 ID 在私有 `gateway.log` 中查找 `auth_rejected`，查看缺少请求头、重复请求头、格式错误或 Token 不匹配等原因。相同原因每五秒最多记录一次，日志不保存请求头的值。
 
@@ -102,10 +119,11 @@ voice 可用 ID、显式别名或 `{"id":"aimisi"}`。input 非空、最多 4096
 官方 SDK 示例（在客户端环境安装 `openai`，或 setup 使用 `-Dev`）：
 
 ```python
-from pathlib import Path
+import os
+
 from openai import OpenAI
 
-token = Path("config/secrets/api-token.txt").read_text(encoding="utf-8").strip()
+token = os.environ["GSV_GATEWAY_TOKEN"]  # 在客户端环境中设置分配给它的 Token
 client = OpenAI(base_url="http://127.0.0.1:16681/v1", api_key=token, max_retries=0, timeout=750)
 with client.audio.speech.with_streaming_response.create(
     model="gpt-sovits", voice="aimisi", input="你好，这是语音测试。", response_format="mp3"

@@ -47,7 +47,7 @@ def test_schema_diagnostic_has_field_but_never_input_values(config):
     data = json.loads(config.path.read_text())
     marker = "PRIVATE_INVALID_CONFIG_VALUE"
     data["server"] = {"port": marker}
-    data["auth"]["token"] = marker
+    data["auth"] = {"token": marker}
     config.path.write_text(json.dumps(data))
     loaded, details = load_diagnostic_config(config.path)
     assert loaded is None

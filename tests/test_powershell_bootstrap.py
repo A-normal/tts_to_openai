@@ -6,6 +6,9 @@ from pathlib import Path
 
 import pytest
 
+from gsv_gateway.config import TokenFile
+from gsv_gateway.security import require_private
+
 
 @pytest.mark.skipif(os.name != "nt", reason="Windows PowerShell 5.1")
 def test_doctor_without_prepared_or_global_python(config, tmp_path):
@@ -39,3 +42,30 @@ def test_doctor_without_prepared_or_global_python(config, tmp_path):
     codes = {row["code"] for row in report["checks"]}
     assert {"CONFIG_JSONC", "PYTHON_NOT_PREPARED", "DEEP_CHECKS"} <= codes
     assert not (tmp_path / "runtime").exists()
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows PowerShell and private ACLs")
+def test_setup_token_initialization_is_private_and_idempotent(tmp_path):
+    source = Path(__file__).resolve().parents[1] / "scripts" / "common.ps1"
+    directory = tmp_path / "private tokens"
+    env = os.environ | {"GATEWAY_TEST_COMMON": str(source), "GATEWAY_TEST_SECRETS": str(directory)}
+    executable = Path(env["SYSTEMROOT"]) / "System32/WindowsPowerShell/v1.0/powershell.exe"
+    command = [
+        str(executable),
+        "-NoProfile",
+        "-NonInteractive",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-Command",
+        ". $env:GATEWAY_TEST_COMMON; Initialize-GatewayTokens $env:GATEWAY_TEST_SECRETS",
+    ]
+    subprocess.run(command, env=env, capture_output=True, check=True, timeout=15)
+    path = directory / "api-tokens.jsonc"
+    require_private(directory)
+    require_private(path)
+    before = path.read_bytes()
+    entries = TokenFile.model_validate_json(before).tokens
+    assert len(entries) == 1 and entries[0].enabled and len(entries[0].token) == 43
+    subprocess.run(command, env=env, capture_output=True, check=True, timeout=15)
+    assert path.read_bytes() == before
+    assert list(directory.iterdir()) == [path]

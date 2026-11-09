@@ -71,15 +71,7 @@ try {
             $target=Join-Path $configRoot ($name+'.jsonc')
             if (-not (Test-Path -LiteralPath $target)) { Copy-Item -LiteralPath (Join-Path $configRoot ($name+'.example.jsonc')) -Destination $target }
         }
-        $secrets=Join-Path $configRoot 'secrets';[IO.Directory]::CreateDirectory($secrets)|Out-Null;Set-PrivateAcl $secrets $true
-        $token=Join-Path $secrets 'api-token.txt'
-        if (-not (Test-Path -LiteralPath $token)) {
-            $random=New-Object byte[] 32;$rng=[Security.Cryptography.RandomNumberGenerator]::Create()
-            try{$rng.GetBytes($random)}finally{$rng.Dispose()}
-            $value=[Convert]::ToBase64String($random).TrimEnd('=').Replace('+','-').Replace('/','_')
-            [IO.File]::WriteAllText($token,$value,(New-Object Text.UTF8Encoding($false)))
-            Set-PrivateAcl $token
-        }
+        Initialize-GatewayTokens (Join-Path $configRoot 'secrets')
     }
     Remove-Item -LiteralPath (Join-Path $runtime 'installing.json') -Force
     Write-Output 'ENV_READY / APP_CONFIG_PENDING: tools prepared. Configure assets and run doctor; no gateway/TTS process was started.'

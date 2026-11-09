@@ -88,7 +88,7 @@
       "additionalProperties": false,
       "properties": {
         "token_file": {
-          "default": "secrets/api-token.txt",
+          "default": "secrets/api-tokens.jsonc",
           "title": "Token File",
           "type": "string"
         }

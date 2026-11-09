@@ -49,7 +49,7 @@ async def test_startup_real_flac_roundtrip_and_snapshot_selection(service, monke
         encoding="utf-8"
     )
     assert "startup_test_success" in log and '"decoder_exit": 0' in log
-    assert service.token not in log and service.config.value.startup_test.text not in log
+    assert service.tokens[0].decode("ascii") not in log and service.config.value.startup_test.text not in log
 
 
 async def test_startup_storage_failure_does_not_trigger_backend_restart(service, monkeypatch):
@@ -120,7 +120,7 @@ async def test_official_sdk_against_in_process_asgi(service):
 
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=create_app(service))) as http:
         client = AsyncOpenAI(
-            api_key=service.token, base_url="http://test/v1", http_client=http, max_retries=0
+            api_key=service.tokens[0].decode("ascii"), base_url="http://test/v1", http_client=http, max_retries=0
         )
         models = await client.models.list()
         assert [item.id for item in models.data] == ["gpt-sovits"]
@@ -147,7 +147,7 @@ async def test_official_sdk_recognizes_error_contract(service, monkeypatch, stat
         service.state = "recovering"
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=create_app(service))) as http:
         client = AsyncOpenAI(
-            api_key="invalid" if status == 401 else service.token,
+            api_key="invalid" if status == 401 else service.tokens[0].decode("ascii"),
             base_url="http://test/v1",
             http_client=http,
             max_retries=0,

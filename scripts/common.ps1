@@ -65,6 +65,27 @@ namespace GSVGateway {
     }
 }
 
+function Initialize-GatewayTokens([string]$SecretsDirectory) {
+    [IO.Directory]::CreateDirectory($SecretsDirectory) | Out-Null
+    Set-PrivateAcl $SecretsDirectory $true
+    $target = Join-Path $SecretsDirectory 'api-tokens.jsonc'
+    if (Test-Path -LiteralPath $target) { return }
+
+    $random = New-Object byte[] 32
+    $rng = [Security.Cryptography.RandomNumberGenerator]::Create()
+    try { $rng.GetBytes($random) } finally { $rng.Dispose() }
+    $token = [Convert]::ToBase64String($random).TrimEnd('=').Replace('+','-').Replace('/','_')
+    $contents = @{ tokens = @(@{ id = 'default'; token = $token; enabled = $true }) } | ConvertTo-Json -Depth 4
+    $pending = Join-Path $SecretsDirectory ('.pending-' + [Guid]::NewGuid().ToString('N'))
+    try {
+        [IO.File]::WriteAllText($pending, $contents, (New-Object Text.UTF8Encoding($false)))
+        Set-PrivateAcl $pending
+        [IO.File]::Move($pending, $target)
+    } finally {
+        if (Test-Path -LiteralPath $pending) { Remove-Item -LiteralPath $pending -Force }
+    }
+}
+
 function Assert-ChildPath([string]$Root, [string]$Target) {
     $base = [IO.Path]::GetFullPath($Root).TrimEnd('\') + '\'
     $resolved = [IO.Path]::GetFullPath($Target)

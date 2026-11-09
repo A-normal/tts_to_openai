@@ -1,0 +1,152 @@
+{
+  "$defs": {
+    "Engine": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "const": "gpt-sovits",
+          "default": "gpt-sovits",
+          "title": "Id",
+          "type": "string"
+        },
+        "created": {
+          "default": 1794009600,
+          "minimum": 0,
+          "title": "Created",
+          "type": "integer"
+        },
+        "owned_by": {
+          "default": "local",
+          "title": "Owned By",
+          "type": "string"
+        }
+      },
+      "title": "Engine",
+      "type": "object"
+    },
+    "Voice": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "aliases": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Aliases",
+          "type": "array"
+        },
+        "declared_languages": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Declared Languages",
+          "type": "array"
+        },
+        "backend_options": {
+          "$ref": "#/$defs/GSVOptions"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "declared_languages",
+        "backend_options"
+      ],
+      "title": "Voice",
+      "type": "object"
+    },
+    "GSVOptions": {
+      "additionalProperties": false,
+      "properties": {
+        "gpt_weights": {
+          "title": "Gpt Weights",
+          "type": "string"
+        },
+        "sovits_weights": {
+          "title": "Sovits Weights",
+          "type": "string"
+        },
+        "ref_audio_path": {
+          "title": "Ref Audio Path",
+          "type": "string"
+        },
+        "prompt_text": {
+          "minLength": 1,
+          "title": "Prompt Text",
+          "type": "string"
+        },
+        "prompt_lang": {
+          "title": "Prompt Lang",
+          "type": "string"
+        },
+        "text_lang": {
+          "title": "Text Lang",
+          "type": "string"
+        },
+        "expected_sample_rate": {
+          "exclusiveMinimum": 0,
+          "maximum": 192000,
+          "title": "Expected Sample Rate",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "gpt_weights",
+        "sovits_weights",
+        "ref_audio_path",
+        "prompt_text",
+        "prompt_lang",
+        "text_lang",
+        "expected_sample_rate"
+      ],
+      "title": "GSVOptions",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 1,
+      "default": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "backend_type": {
+      "const": "gpt_sovits",
+      "default": "gpt_sovits",
+      "title": "Backend Type",
+      "type": "string"
+    },
+    "engine": {
+      "$ref": "#/$defs/Engine"
+    },
+    "assets_root": {
+      "title": "Assets Root",
+      "type": "string"
+    },
+    "voices": {
+      "items": {
+        "$ref": "#/$defs/Voice"
+      },
+      "minItems": 1,
+      "title": "Voices",
+      "type": "array"
+    }
+  },
+  "required": [
+    "assets_root",
+    "voices"
+  ],
+  "title": "VoiceRegistry",
+  "type": "object"
+}

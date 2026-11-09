@@ -1,0 +1,35 @@
+[build-system]
+requires = ["hatchling==1.27.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "gsv-openai-gateway"
+version = "0.1.0"
+description = "Windows local GPT-SoVITS gateway implementing the OpenAI Speech core protocol"
+requires-python = ">=3.11,<3.13"
+dependencies = [
+  "fastapi>=0.115,<1",
+  "pydantic>=2.10,<3",
+  "uvicorn>=0.34,<1",
+  "httpx==0.28.1",
+  "pywin32>=311; sys_platform == 'win32'",
+  "PyYAML==6.0.3",
+]
+
+[dependency-groups]
+dev = ["pytest>=8,<10", "pytest-asyncio>=0.26,<2", "openai>=1.80,<3", "ruff>=0.11,<1"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["gsv_gateway"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 110
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "B"]

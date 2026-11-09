@@ -1,0 +1,23 @@
+# User-managed template: replace domain and certificate paths.
+# The project does not install Nginx or publish a public service.
+server {
+    listen 443 ssl;
+    server_name tts.example.invalid;
+    ssl_certificate     /path/to/fullchain.pem;
+    ssl_certificate_key /path/to/privkey.pem;
+    client_max_body_size 64k;
+    send_timeout 750s;
+    location ~ ^/v1/(models(/gpt-sovits)?|audio/speech)$ {
+        proxy_pass http://127.0.0.1:16681;
+        proxy_http_version 1.1;
+        proxy_set_header Authorization $http_authorization;
+        proxy_set_header Connection "";
+        proxy_buffering off;
+        proxy_cache off;
+        proxy_max_temp_file_size 0;
+        proxy_read_timeout 750s;
+        proxy_send_timeout 750s;
+    }
+    # /voices is optional; /health/* and the GSV backend are not published.
+    location / { return 404; }
+}

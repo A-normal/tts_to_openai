@@ -1,0 +1,509 @@
+{
+  "$defs": {
+    "Audio": {
+      "additionalProperties": false,
+      "properties": {
+        "ffmpeg_executable": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ffmpeg Executable"
+        },
+        "ffprobe_executable": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ffprobe Executable"
+        },
+        "default_response_format": {
+          "const": "mp3",
+          "default": "mp3",
+          "title": "Default Response Format",
+          "type": "string"
+        },
+        "pcm_sample_rate": {
+          "const": 24000,
+          "default": 24000,
+          "title": "Pcm Sample Rate",
+          "type": "integer"
+        },
+        "opus_sample_rate": {
+          "const": 48000,
+          "default": 48000,
+          "title": "Opus Sample Rate",
+          "type": "integer"
+        },
+        "mp3_bitrate_kbps": {
+          "default": 128,
+          "maximum": 320,
+          "minimum": 32,
+          "title": "Mp3 Bitrate Kbps",
+          "type": "integer"
+        },
+        "opus_bitrate_kbps": {
+          "default": 64,
+          "maximum": 256,
+          "minimum": 16,
+          "title": "Opus Bitrate Kbps",
+          "type": "integer"
+        },
+        "aac_bitrate_kbps": {
+          "default": 128,
+          "maximum": 320,
+          "minimum": 32,
+          "title": "Aac Bitrate Kbps",
+          "type": "integer"
+        },
+        "max_buffer_bytes": {
+          "default": 1048576,
+          "maximum": 16777216,
+          "minimum": 16384,
+          "title": "Max Buffer Bytes",
+          "type": "integer"
+        },
+        "stderr_capture_bytes": {
+          "default": 65536,
+          "maximum": 1048576,
+          "minimum": 0,
+          "title": "Stderr Capture Bytes",
+          "type": "integer"
+        }
+      },
+      "title": "Audio",
+      "type": "object"
+    },
+    "Auth": {
+      "additionalProperties": false,
+      "properties": {
+        "token_file": {
+          "default": "secrets/api-token.txt",
+          "title": "Token File",
+          "type": "string"
+        }
+      },
+      "title": "Auth",
+      "type": "object"
+    },
+    "Auto": {
+      "additionalProperties": false,
+      "properties": {
+        "python_executable": {
+          "default": "",
+          "title": "Python Executable",
+          "type": "string"
+        },
+        "arguments": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Arguments",
+          "type": "array"
+        },
+        "working_directory": {
+          "default": "",
+          "title": "Working Directory",
+          "type": "string"
+        },
+        "config_template": {
+          "default": "",
+          "title": "Config Template",
+          "type": "string"
+        },
+        "runtime_config": {
+          "default": "data/backend/tts-infer.yaml",
+          "title": "Runtime Config",
+          "type": "string"
+        }
+      },
+      "title": "Auto",
+      "type": "object"
+    },
+    "Backend": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "gpt_sovits",
+          "default": "gpt_sovits",
+          "title": "Type",
+          "type": "string"
+        },
+        "mode": {
+          "default": "auto",
+          "enum": [
+            "connect",
+            "auto"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "exclusive": {
+          "const": true,
+          "default": true,
+          "title": "Exclusive",
+          "type": "boolean"
+        },
+        "auto": {
+          "$ref": "#/$defs/Auto"
+        },
+        "recovery": {
+          "$ref": "#/$defs/Recovery"
+        },
+        "last_good_config": {
+          "default": "data/backend/last-good.yaml",
+          "title": "Last Good Config",
+          "type": "string"
+        }
+      },
+      "title": "Backend",
+      "type": "object"
+    },
+    "Control": {
+      "additionalProperties": false,
+      "properties": {
+        "max_message_bytes": {
+          "default": 65536,
+          "maximum": 65536,
+          "minimum": 1024,
+          "title": "Max Message Bytes",
+          "type": "integer"
+        },
+        "timeout_seconds": {
+          "default": 5,
+          "exclusiveMinimum": 0,
+          "maximum": 60,
+          "title": "Timeout Seconds",
+          "type": "number"
+        }
+      },
+      "title": "Control",
+      "type": "object"
+    },
+    "Inference": {
+      "additionalProperties": false,
+      "properties": {
+        "streaming_mode": {
+          "const": 1,
+          "default": 1,
+          "title": "Streaming Mode",
+          "type": "integer"
+        },
+        "text_split_method": {
+          "default": "cut5",
+          "title": "Text Split Method",
+          "type": "string"
+        },
+        "batch_size": {
+          "const": 1,
+          "default": 1,
+          "title": "Batch Size",
+          "type": "integer"
+        },
+        "split_bucket": {
+          "const": false,
+          "default": false,
+          "title": "Split Bucket",
+          "type": "boolean"
+        },
+        "parallel_infer": {
+          "const": false,
+          "default": false,
+          "title": "Parallel Infer",
+          "type": "boolean"
+        },
+        "use_cuda_graph": {
+          "default": false,
+          "title": "Use Cuda Graph",
+          "type": "boolean"
+        }
+      },
+      "title": "Inference",
+      "type": "object"
+    },
+    "Logging": {
+      "additionalProperties": false,
+      "properties": {
+        "directory": {
+          "default": "data/logs",
+          "title": "Directory",
+          "type": "string"
+        },
+        "level": {
+          "default": "INFO",
+          "enum": [
+            "DEBUG",
+            "INFO",
+            "WARNING",
+            "ERROR"
+          ],
+          "title": "Level",
+          "type": "string"
+        },
+        "rotate_bytes": {
+          "default": 10485760,
+          "minimum": 4096,
+          "title": "Rotate Bytes",
+          "type": "integer"
+        },
+        "backup_count": {
+          "default": 5,
+          "maximum": 100,
+          "minimum": 1,
+          "title": "Backup Count",
+          "type": "integer"
+        },
+        "log_input": {
+          "const": false,
+          "default": false,
+          "title": "Log Input",
+          "type": "boolean"
+        },
+        "log_reference_text": {
+          "const": false,
+          "default": false,
+          "title": "Log Reference Text",
+          "type": "boolean"
+        }
+      },
+      "title": "Logging",
+      "type": "object"
+    },
+    "Queue": {
+      "additionalProperties": false,
+      "properties": {
+        "max_pending": {
+          "default": 8,
+          "maximum": 1024,
+          "minimum": 1,
+          "title": "Max Pending",
+          "type": "integer"
+        },
+        "wait_timeout_seconds": {
+          "default": 120,
+          "exclusiveMinimum": 0,
+          "title": "Wait Timeout Seconds",
+          "type": "number"
+        }
+      },
+      "title": "Queue",
+      "type": "object"
+    },
+    "Recovery": {
+      "additionalProperties": false,
+      "properties": {
+        "max_attempts": {
+          "default": 3,
+          "maximum": 3,
+          "minimum": 0,
+          "title": "Max Attempts",
+          "type": "integer"
+        },
+        "backoff_seconds": {
+          "items": {
+            "type": "number"
+          },
+          "title": "Backoff Seconds",
+          "type": "array"
+        }
+      },
+      "title": "Recovery",
+      "type": "object"
+    },
+    "Server": {
+      "additionalProperties": false,
+      "properties": {
+        "host": {
+          "default": "127.0.0.1",
+          "title": "Host",
+          "type": "string"
+        },
+        "port": {
+          "default": 16681,
+          "maximum": 65535,
+          "minimum": 1,
+          "title": "Port",
+          "type": "integer"
+        },
+        "max_request_bytes": {
+          "default": 65536,
+          "maximum": 65536,
+          "minimum": 1024,
+          "title": "Max Request Bytes",
+          "type": "integer"
+        },
+        "max_concurrent_requests": {
+          "default": 32,
+          "maximum": 1024,
+          "minimum": 1,
+          "title": "Max Concurrent Requests",
+          "type": "integer"
+        },
+        "body_timeout_seconds": {
+          "default": 15,
+          "exclusiveMinimum": 0,
+          "title": "Body Timeout Seconds",
+          "type": "number"
+        }
+      },
+      "title": "Server",
+      "type": "object"
+    },
+    "StartupTest": {
+      "additionalProperties": false,
+      "properties": {
+        "voice": {
+          "title": "Voice",
+          "type": "string"
+        },
+        "text": {
+          "default": "你好，这是启动自检。正在检查语音生成和音频编码。你好，测试结束。",
+          "title": "Text",
+          "type": "string"
+        },
+        "response_format": {
+          "const": "flac",
+          "default": "flac",
+          "title": "Response Format",
+          "type": "string"
+        },
+        "speed": {
+          "const": 1,
+          "default": 1,
+          "title": "Speed",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "voice"
+      ],
+      "title": "StartupTest",
+      "type": "object"
+    },
+    "Timeouts": {
+      "additionalProperties": false,
+      "properties": {
+        "startup_seconds": {
+          "default": 300,
+          "exclusiveMinimum": 0,
+          "title": "Startup Seconds",
+          "type": "number"
+        },
+        "task_total_seconds": {
+          "default": 600,
+          "exclusiveMinimum": 0,
+          "title": "Task Total Seconds",
+          "type": "number"
+        },
+        "model_operation_seconds": {
+          "default": 180,
+          "exclusiveMinimum": 0,
+          "title": "Model Operation Seconds",
+          "type": "number"
+        },
+        "first_audio_seconds": {
+          "default": 180,
+          "exclusiveMinimum": 0,
+          "title": "First Audio Seconds",
+          "type": "number"
+        },
+        "first_encoded_audio_seconds": {
+          "default": 30,
+          "exclusiveMinimum": 0,
+          "title": "First Encoded Audio Seconds",
+          "type": "number"
+        },
+        "upstream_idle_seconds": {
+          "default": 120,
+          "exclusiveMinimum": 0,
+          "title": "Upstream Idle Seconds",
+          "type": "number"
+        },
+        "disconnect_drain_seconds": {
+          "default": 120,
+          "exclusiveMinimum": 0,
+          "title": "Disconnect Drain Seconds",
+          "type": "number"
+        },
+        "downstream_stall_seconds": {
+          "default": 60,
+          "exclusiveMinimum": 0,
+          "title": "Downstream Stall Seconds",
+          "type": "number"
+        },
+        "shutdown_drain_seconds": {
+          "default": 30,
+          "exclusiveMinimum": 0,
+          "title": "Shutdown Drain Seconds",
+          "type": "number"
+        }
+      },
+      "title": "Timeouts",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 1,
+      "default": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "server": {
+      "$ref": "#/$defs/Server"
+    },
+    "auth": {
+      "$ref": "#/$defs/Auth"
+    },
+    "voices_file": {
+      "default": "voices.jsonc",
+      "title": "Voices File",
+      "type": "string"
+    },
+    "runtime_dir": {
+      "default": "data",
+      "title": "Runtime Dir",
+      "type": "string"
+    },
+    "backend": {
+      "$ref": "#/$defs/Backend"
+    },
+    "queue": {
+      "$ref": "#/$defs/Queue"
+    },
+    "timeouts": {
+      "$ref": "#/$defs/Timeouts"
+    },
+    "audio": {
+      "$ref": "#/$defs/Audio"
+    },
+    "inference": {
+      "$ref": "#/$defs/Inference"
+    },
+    "logging": {
+      "$ref": "#/$defs/Logging"
+    },
+    "startup_test": {
+      "$ref": "#/$defs/StartupTest"
+    },
+    "control": {
+      "$ref": "#/$defs/Control"
+    }
+  },
+  "required": [
+    "startup_test"
+  ],
+  "title": "GatewayConfig",
+  "type": "object"
+}

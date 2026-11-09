@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "platform": "windows-x86_64",
+  "uv": {
+    "version": "0.9.8",
+    "url": "https://github.com/astral-sh/uv/releases/download/0.9.8/uv-x86_64-pc-windows-msvc.zip",
+    "archive": "cache/uv-0.9.8.zip",
+    "sha256": "bb94629392b11d49f202e748d5842a0c89ebe570c152ad8ea1425ece01dc4222"
+  },
+  "python": {
+    "version": "3.12.12",
+    "build": "20251028",
+    "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20251028/cpython-3.12.12%2B20251028-x86_64-pc-windows-msvc-install_only_stripped.tar.gz",
+    "sha256": "b01ce5aed9bae58023ccfba76c9cf0e789aa2ca36057ee6e6af054da2a2d4eb1",
+    "executable": "python/cpython-3.12.12-windows-x86_64-none/python.exe",
+    "download_validation": "Pinned uv 0.9.8 compiled download metadata verifies the SHA-256"
+  },
+  "ffmpeg": {
+    "version": "7.1.1-essentials_build-www.gyan.dev",
+    "url": "https://github.com/GyanD/codexffmpeg/releases/download/7.1.1/ffmpeg-7.1.1-essentials_build.zip",
+    "archive": "cache/ffmpeg-7.1.1-essentials_build.zip",
+    "sha256": "04861d3339c5ebe38b56c19a15cf2c0cc97f5de4fa8910e4d47e5e6404e4a2d4",
+    "ffmpeg": "ffmpeg/ffmpeg-7.1.1-essentials_build/bin/ffmpeg.exe",
+    "ffprobe": "ffmpeg/ffmpeg-7.1.1-essentials_build/bin/ffprobe.exe",
+    "required_encoders": [
+      "libmp3lame",
+      "libopus",
+      "aac",
+      "flac",
+      "pcm_s16le"
+    ]
+  }
+}

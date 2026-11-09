@@ -1,0 +1,148 @@
+// 用户配置（JSONC）：支持 // 和 /* */ 注释，不支持尾随逗号。
+// 所有可调项从文件读取；CLI 显式覆盖优先，修改文件后重启生效。
+{
+  // 配置结构版本，固定为 1；升级结构时由发行说明指导迁移。 默认值：1。
+  "schema_version": 1,
+  // 与 gateway.backend.type 一致，首版固定 gpt_sovits。 默认值："gpt_sovits"。
+  "backend_type": "gpt_sovits",
+  // 固定公开模型元数据，不随当前角色或启动时间变化。
+  "engine": {
+    // 规范声音 ID；全局唯一；HTTP voice 可使用该 ID。 默认值："gpt-sovits"。
+    // 规范唯一 ID；可用于 HTTP voice 或启动声音。
+    "id": "gpt-sovits",
+    // 引擎注册时间的 Unix 秒，不冒充训练时间。 默认值：1794009600。
+    "created": 1794009600,
+    // 本地模型提供者标识。 默认值："local"。
+    "owned_by": "local"
+  },
+  // 声音资产根目录，请按实际 GSV 安装位置修改。相对值以本文件目录为基准。
+  "assets_root": "C:/path/to/GPT-SoVITS",
+  // 初始四角色注册；列表不代表全部已加载或通过听感验收。
+  "voices": [
+    {
+      // 规范唯一 ID；可用于 HTTP voice 或启动声音。
+      "id": "aimisi",
+      // 角色显示名称。
+      "name": "爱弥斯",
+      // 显式声音别名，全局唯一，不可与其他 ID/别名冲突。
+      "aliases": [
+        "爱弥斯"
+      ],
+      // 已配置的能力声明，当前仅 zh，其他语言需真实验收。
+      "declared_languages": [
+        "zh"
+      ],
+      // 适配器私有参数；公共 API/声音查询不会泄漏这些内容。
+      "backend_options": {
+        // GPT 权重路径，相对于 assets_root；必须与 SoVITS 配套，修改后重启。
+        "gpt_weights": "GPT_weights_v4/爱弥斯-e5.ckpt",
+        // SoVITS 权重路径；V4 LoRA 还依赖 GSV 内已安装底模和声码器。
+        "sovits_weights": "SoVITS_weights_v4/爱弥斯_e8_s144_l32.pth",
+        // 3–10 秒参考 WAV 路径，相对于 assets_root。
+        "ref_audio_path": "output/slicer_opt/1.wav",
+        // 准确参考标注；禁止写入日志或公网响应，不是用户生成 input。
+        "prompt_text": "飞行雪绒这个名字，一听就知道是因为雪绒海豹起的吧。",
+        // 参考文本语言，当前 zh；相同参考文本不允许不同语言缓存配置。
+        "prompt_lang": "zh",
+        // 生成文本语言，当前 zh；能力取决于真实权重，不自动翻译。
+        "text_lang": "zh",
+        // 后端 PCM 采样率 Hz；当前 V4 固定预期 48000，不匹配时拒绝。
+        "expected_sample_rate": 48000
+      }
+    },
+    {
+      // 规范唯一 ID；可用于 HTTP voice 或启动声音。
+      "id": "ling",
+      // 角色显示名称。
+      "name": "铃",
+      // 显式声音别名，全局唯一，不可与其他 ID/别名冲突。
+      "aliases": [
+        "铃",
+        "玲"
+      ],
+      // 已配置的能力声明，当前仅 zh，其他语言需真实验收。
+      "declared_languages": [
+        "zh"
+      ],
+      // 适配器私有参数；公共 API/声音查询不会泄漏这些内容。
+      "backend_options": {
+        // GPT 权重路径，相对于 assets_root；必须与 SoVITS 配套，修改后重启。
+        "gpt_weights": "GPT_weights_v4/铃-e10.ckpt",
+        // SoVITS 权重路径；V4 LoRA 还依赖 GSV 内已安装底模和声码器。
+        "sovits_weights": "SoVITS_weights_v4/铃_e10_s5520_l32.pth",
+        // 3–10 秒参考 WAV 路径，相对于 assets_root。
+        "ref_audio_path": "reference_audios/【玲】当然，怪物的残骸还是由治安局负责采集，不过，负责押运的自动证务车在穿过空洞后，就会直接和汉的对接。.wav",
+        // 准确参考标注；禁止写入日志或公网响应，不是用户生成 input。
+        "prompt_text": "当然，怪物的残骸还是由治安局负责采集，不过，负责押运的自动证务车在穿过空洞后，就会直接和汉的对接。",
+        // 参考文本语言，当前 zh；相同参考文本不允许不同语言缓存配置。
+        "prompt_lang": "zh",
+        // 生成文本语言，当前 zh；能力取决于真实权重，不自动翻译。
+        "text_lang": "zh",
+        // 后端 PCM 采样率 Hz；当前 V4 固定预期 48000，不匹配时拒绝。
+        "expected_sample_rate": 48000
+      }
+    },
+    {
+      // 规范唯一 ID；可用于 HTTP voice 或启动声音。
+      "id": "shouanren",
+      // 角色显示名称。
+      "name": "守岸人",
+      // 显式声音别名，全局唯一，不可与其他 ID/别名冲突。
+      "aliases": [
+        "守岸人"
+      ],
+      // 已配置的能力声明，当前仅 zh，其他语言需真实验收。
+      "declared_languages": [
+        "zh"
+      ],
+      // 适配器私有参数；公共 API/声音查询不会泄漏这些内容。
+      "backend_options": {
+        // GPT 权重路径，相对于 assets_root；必须与 SoVITS 配套，修改后重启。
+        "gpt_weights": "GPT_weights_v4/守岸人_ZH-e10.ckpt",
+        // SoVITS 权重路径；V4 LoRA 还依赖 GSV 内已安装底模和声码器。
+        "sovits_weights": "SoVITS_weights_v4/守岸人_ZH_e10_s310_l32.pth",
+        // 3–10 秒参考 WAV 路径，相对于 assets_root。
+        "ref_audio_path": "reference_audios/【守岸人】但我不确定……见到她是不是一件正确的事。.wav",
+        // 准确参考标注；禁止写入日志或公网响应，不是用户生成 input。
+        "prompt_text": "但我不确定……见到她是不是一件正确的事。",
+        // 参考文本语言，当前 zh；相同参考文本不允许不同语言缓存配置。
+        "prompt_lang": "zh",
+        // 生成文本语言，当前 zh；能力取决于真实权重，不自动翻译。
+        "text_lang": "zh",
+        // 后端 PCM 采样率 Hz；当前 V4 固定预期 48000，不匹配时拒绝。
+        "expected_sample_rate": 48000
+      }
+    },
+    {
+      // 规范唯一 ID；可用于 HTTP voice 或启动声音。
+      "id": "weiweian",
+      // 角色显示名称。
+      "name": "薇薇安",
+      // 显式声音别名，全局唯一，不可与其他 ID/别名冲突。
+      "aliases": [
+        "薇薇安"
+      ],
+      // 已配置的能力声明，当前仅 zh，其他语言需真实验收。
+      "declared_languages": [
+        "zh"
+      ],
+      // 适配器私有参数；公共 API/声音查询不会泄漏这些内容。
+      "backend_options": {
+        // GPT 权重路径，相对于 assets_root；必须与 SoVITS 配套，修改后重启。
+        "gpt_weights": "GPT_weights_v4/薇薇安-e10.ckpt",
+        // SoVITS 权重路径；V4 LoRA 还依赖 GSV 内已安装底模和声码器。
+        "sovits_weights": "SoVITS_weights_v4/薇薇安_e10_s1040_l32.pth",
+        // 3–10 秒参考 WAV 路径，相对于 assets_root。
+        "ref_audio_path": "reference_audios/【薇薇安】我憎恶自己的眼泪，我憎恶自己的存在。.wav",
+        // 准确参考标注；禁止写入日志或公网响应，不是用户生成 input。
+        "prompt_text": "我憎恶自己的眼泪，我憎恶自己的存在。",
+        // 参考文本语言，当前 zh；相同参考文本不允许不同语言缓存配置。
+        "prompt_lang": "zh",
+        // 生成文本语言，当前 zh；能力取决于真实权重，不自动翻译。
+        "text_lang": "zh",
+        // 后端 PCM 采样率 Hz；当前 V4 固定预期 48000，不匹配时拒绝。
+        "expected_sample_rate": 48000
+      }
+    }
+  ]
+}

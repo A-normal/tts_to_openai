@@ -1,0 +1,165 @@
+// 用户配置（JSONC）：支持 // 和 /* */ 注释，不支持尾随逗号。
+// 所有可调项从文件读取；CLI 显式覆盖优先，修改文件后重启生效。
+{
+  // 配置结构版本，固定为 1；升级结构时由发行说明指导迁移。 默认值：1。
+  "schema_version": 1,
+  // OpenAI 兼容 API 监听和入口资源上限；与本地 GSV 的固定 9880 端口分开。
+  "server": {
+    // 默认仅回环监听；公网访问通过用户配置的 TLS 反代。 默认值："127.0.0.1"。
+    "host": "127.0.0.1",
+    // 兼容 API 端口，范围 1–65535；不得与 GSV 回环 9880 冲突。 默认值：16681。
+    "port": 16681,
+    // 实际读取的正文大小上限，单位字节；分块请求同样累计，最大 65536。 默认值：65536。
+    "max_request_bytes": 65536,
+    // 入队前及传输中的 HTTP 请求并发上限；不等于 FIFO 等待位数量；满时返回 429。 默认值：32。
+    "max_concurrent_requests": 32,
+    // 正文累计读取期限，单位秒；不影响合成和音频流的等待期限。 默认值：15。
+    "body_timeout_seconds": 15
+  },
+  // 服务级鉴权，始终开启；不能用 URL query 传密钥。
+  "auth": {
+    // 单行私有 Token 文件；至少 32 个安全随机字节生成。setup -InitConfig 可生成，修改后重启。 默认值："secrets/api-token.txt"。
+    "token_file": "secrets/api-token.txt"
+  },
+  // 声音注册表文件；相对路径以本文件目录为基准。 默认值："voices.jsonc"。
+  "voices_file": "voices.jsonc",
+  // 私有运行状态目录；快照、工作 YAML、日志都必须在此目录内；不可提交 Git。 默认值："data"。
+  "runtime_dir": "data",
+  // 仅支持 gpt_sovits；后端固定 http://127.0.0.1:9880，不提供 URL 或端口覆盖。
+  "backend": {
+    // 首版固定 gpt_sovits，不接受动态插件/import 路径。 默认值："gpt_sovits"。
+    "type": "gpt_sovits",
+    // auto：仅在明确连接拒绝且无监听时自启；connect：只连接、不启动或重启外部进程。 默认值："auto"。
+    "mode": "auto",
+    // 必须为 true；外部 WebUI 不得同时推理或切换权重。 默认值：true。
+    "exclusive": true,
+    // 仅 auto 模式实际创建 owned 后端时使用；附着外部后端不会取得进程归属。
+    "auto": {
+      // GSV 自带 Python 的绝对路径。请按实际安装位置修改。
+      "python_executable": "C:/path/to/GPT-SoVITS/runtime/python.exe",
+      // 仅指定 -I 和 api_v2.py；程序统一添加回环 -a、私有 -c；禁止 -p/--port 覆盖。
+      "arguments": [
+        "-I",
+        "api_v2.py"
+      ],
+      // GSV 安装根目录。模型自身相对路径在该目录解析。
+      "working_directory": "C:/path/to/GPT-SoVITS",
+      // 可信原始 GSV YAML 模板。网关用它构建供受管后端写回的工作副本。
+      "config_template": "C:/path/to/GPT-SoVITS/GPT_SoVITS/configs/tts_infer.yaml",
+      // GSV 可写工作副本；必须与 last_good_config 分离；故障恢复不信任此文件。 默认值："data/backend/tts-infer.yaml"。
+      "runtime_config": "data/backend/tts-infer.yaml"
+    },
+    // 仅恢复 owned 后端；外部实例状态不明需人工处理，不能自动终止。
+    "recovery": {
+      // 生命周期累计恢复次数上限，范围 0–3；显式 restart 后重置；不重放用户请求。 默认值：3。
+      "max_attempts": 3,
+      // 每次恢复前退避秒数，数量必须覆盖 max_attempts；默认 2/5/15。
+      "backoff_seconds": [
+        2,
+        5,
+        15
+      ]
+    },
+    // 网关完整成功后原子保存的最后成功快照，包含私有参考配置；不作为 GSV -c。 默认值："data/backend/last-good.yaml"。
+    "last_good_config": "data/backend/last-good.yaml"
+  },
+  // 单 FIFO、单消费者，权重切换、参考准备、合成和恢复共用所有权。
+  "queue": {
+    // 等待位数量，不包含当前执行的一个任务；上限 1024，默认 8。 默认值：8。
+    "max_pending": 8,
+    // 从入队开始计算的等待期限，单位秒；超时返回 429，尚未执行则不访问后端。 默认值：120。
+    "wait_timeout_seconds": 120
+  },
+  // 所有值单位秒、有限且大于 0；阶段期限受任务/启动总剩余期限约束；不会等满期限才发送音频。
+  "timeouts": {
+    // 网关启动总期限：依赖检查、模型准备、合成、FLAC 编码解码、快照、日志到 ready。 默认值：300。
+    "startup_seconds": 300,
+    // 从出队开始的任务总期限，含模型准备、合成、编码、发送和收尾。 默认值：600。
+    "task_total_seconds": 600,
+    // 单次 GPT/SoVITS/参考 setter 期限；超时不能当作后端已取消。 默认值：180。
+    "model_operation_seconds": 180,
+    // 从发出 /tts 到首个合法 PCM；开发期保留 180，四角色冷/热测试后再考虑 30–60。 默认值：180。
+    "first_audio_seconds": 180,
+    // 上游 PCM 块间最大空闲；不得使用 HTTPX 默认 5 秒误断长推理。 默认值：120。
+    "upstream_idle_seconds": 120,
+    // 客户端断开后有界读取丢弃的上限；仍持有串行所有权，取总任务剩余期限更小值。 默认值：120。
+    "disconnect_drain_seconds": 120,
+    // 下游音频写入/背压最大停滞，超时标记断开并进入排空。 默认值：60。
+    "downstream_stall_seconds": 60,
+    // 停止时对当前任务的最大排空等待；排队任务失败，自有子进程关闭，外部 GSV 不终止。 默认值：30。
+    "shutdown_drain_seconds": 30,
+    // 从首个有效 PCM 到首个目标格式有效音频；默认 30；容器头不算首音频。 默认值：30。
+    "first_encoded_audio_seconds": 30
+  },
+  // 六格式统一连续 FFmpeg；不按每段生成文件拼接。
+  "audio": {
+    // null：优先使用 PATH 上通过六格式检查的工具组合，再使用项目 runtime。显式路径无效时直接报错。 默认值：null。
+    "ffmpeg_executable": null,
+    // 与 FFmpeg 同套安装；null 使用自动解析；缺少任一工具或编码器时拒绝就绪。 默认值：null。
+    "ffprobe_executable": null,
+    // 协议默认固定 mp3；请求可选 mp3/opus/aac/flac/wav/pcm。 默认值："mp3"。
+    "default_response_format": "mp3",
+    // MP3 比特率，单位 kbit/s，范围 32–320。 默认值：128。
+    "mp3_bitrate_kbps": 128,
+    // Opus 比特率，单位 kbit/s，范围 16–256；封装为 Ogg。 默认值：64。
+    "opus_bitrate_kbps": 64,
+    // AAC 比特率，单位 kbit/s，范围 32–320；封装为 ADTS。 默认值：128。
+    "aac_bitrate_kbps": 128,
+    // OpenAI PCM 兼容常量 24000 Hz，固定；无头 s16le 单声道，实际重采样。 默认值：24000。
+    "pcm_sample_rate": 24000,
+    // Opus 输出常量 48000 Hz，固定。 默认值：48000。
+    "opus_sample_rate": 48000,
+    // 编码预缓冲/输出队列的字节预算，范围 16384–16777216；不无限缓存全文。 默认值：1048576。
+    "max_buffer_bytes": 1048576,
+    // 编码器诊断摘要保留上限；超出后继续排空，不能因不读 stderr 堵塞；不原样返回公网。 默认值：65536。
+    "stderr_capture_bytes": 65536
+  },
+  // GSV 映射约束；首版接受 V4 分段返回，不承诺单句内部细粒度生成。
+  "inference": {
+    // 固定 1，表示 GSV 分段返回。 默认值：1。
+    "streaming_mode": 1,
+    // GSV 文本切分方法，默认 cut5；更改需验证实际首段和朗读完整性。 默认值："cut5"。
+    "text_split_method": "cut5",
+    // 固定 1，避免整批合成推迟首段。 默认值：1。
+    "batch_size": 1,
+    // 固定 false，保持分段原始顺序。 默认值：false。
+    "split_bucket": false,
+    // 固定 false，后端推理由单消费者串行调度。 默认值：false。
+    "parallel_infer": false,
+    // 默认 false；启用必须先对实际权重和硬件完成验证，不以历史超时推断因果。 默认值：false。
+    "use_cuda_graph": false
+  },
+  // 私有轮转日志，启动日志必须可写才能 ready。
+  "logging": {
+    // 日志目录，必须在 runtime_dir 内；不记录 Token、用户文本、参考文本和原始 GSV 输出。 默认值："data/logs"。
+    "directory": "data/logs",
+    // 日志级别，可选 DEBUG/INFO/WARNING/ERROR；均遵循脱敏边界。 默认值："INFO"。
+    "level": "INFO",
+    // 单个日志轮转阈值，单位字节，最小 4096。 默认值：10485760。
+    "rotate_bytes": 10485760,
+    // 保留轮转日志数量，范围 1–100。 默认值：5。
+    "backup_count": 5,
+    // 必须为 false，禁止持久化用户朗读文本。 默认值：false。
+    "log_input": false,
+    // 必须为 false，禁止将参考文本写日志。 默认值：false。
+    "log_reference_text": false
+  },
+  // 每次启动和 owned 恢复必须执行，不能关闭；验证一个声音不等于四角色全部验收。
+  "startup_test": {
+    // 首次无成功快照时使用的规范声音 ID；有匹配快照时优先快照声音；不接受别名或自动回退。 默认值："aimisi"。
+    "voice": "aimisi",
+    // 固定用途的自检朗读文本，可配置；非空、最多 4096 Unicode 码点。 默认值："你好，这是启动自检。正在检查语音生成和音频编码。你好，测试结束。"。
+    "text": "你好，这是启动自检。正在检查语音生成和音频编码。你好，测试结束。",
+    // 启动自检固定 flac，以真实编码解码校验无损样本数。 默认值："flac"。
+    "response_format": "flac",
+    // 启动自检固定 1.0。 默认值：1.0。
+    "speed": 1.0
+  },
+  // 本机受限命名管道，仅当前用户/管理员；与公网 API Token 权限分离。
+  "control": {
+    // 管道单条 JSON 消息上限，单位字节，最大 65536。 默认值：65536。
+    "max_message_bytes": 65536,
+    // 配置项；含义参照项目操作说明，修改后重启生效。 默认值：5。
+    "timeout_seconds": 5
+  }
+}

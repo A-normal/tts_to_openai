@@ -1,7 +1,7 @@
 import hashlib
 import json
 import os
-import wave
+from itertools import combinations
 from pathlib import Path
 from typing import Literal, get_args, get_origin
 
@@ -17,6 +17,14 @@ from pydantic import (
 )
 
 from . import jsonc
+
+
+class ConfigConstraint(ValueError):
+    """A configuration diagnostic safe to show without echoing input values."""
+
+    def __init__(self, field: str, reason: str):
+        super().__init__(reason)
+        self.field = field
 
 
 class Model(BaseModel):
@@ -64,14 +72,6 @@ class TokenFile(Model):
     tokens: list[TokenEntry] = Field(min_length=1, max_length=128)
 
 
-class Auto(Model):
-    python_executable: StrictStr = ""
-    arguments: list[StrictStr] = Field(default_factory=lambda: ["-I", "api_v2.py"])
-    working_directory: StrictStr = ""
-    config_template: StrictStr = ""
-    runtime_config: StrictStr = "data/backend/tts-infer.yaml"
-
-
 class Recovery(Model):
     max_attempts: StrictInt = Field(default=3, ge=0, le=3)
     backoff_seconds: list[float] = Field(default_factory=lambda: [2, 5, 15])
@@ -88,12 +88,10 @@ class Recovery(Model):
 
 
 class Backend(Model):
-    type: Literal["gpt_sovits"] = "gpt_sovits"
-    mode: Literal["connect", "auto"] = "auto"
-    exclusive: Literal[True] = True
-    auto: Auto = Field(default_factory=Auto)
+    type: StrictStr
+    mode: Literal["connect"] = "connect"
     recovery: Recovery = Field(default_factory=Recovery)
-    last_good_config: StrictStr = "data/backend/last-good.yaml"
+    last_good_config: StrictStr | None = None
 
 
 class Queue(Model):
@@ -126,15 +124,6 @@ class Audio(Model):
     stderr_capture_bytes: StrictInt = Field(default=65536, ge=0, le=1048576)
 
 
-class Inference(Model):
-    streaming_mode: Literal[1] = 1
-    text_split_method: StrictStr = "cut5"
-    batch_size: Literal[1] = 1
-    split_bucket: Literal[False] = False
-    parallel_infer: Literal[False] = False
-    use_cuda_graph: StrictBool = False
-
-
 class Logging(Model):
     directory: StrictStr = "data/logs"
     level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
@@ -162,33 +151,28 @@ class GatewayConfig(Model):
     auth: Auth = Field(default_factory=Auth)
     voices_file: StrictStr = "voices.jsonc"
     runtime_dir: StrictStr = "data"
-    backend: Backend = Field(default_factory=Backend)
+    backend: Backend
     queue: Queue = Field(default_factory=Queue)
     timeouts: Timeouts = Field(default_factory=Timeouts)
     audio: Audio = Field(default_factory=Audio)
-    inference: Inference = Field(default_factory=Inference)
     logging: Logging = Field(default_factory=Logging)
     startup_test: StartupTest
     control: Control = Field(default_factory=Control)
 
     @model_validator(mode="after")
-    def collision(self):
-        if self.server.port == 9880 and self.server.host in {
-            "127.0.0.1",
-            "0.0.0.0",
-            "localhost",
-            "::",
-            "::ffff:127.0.0.1",
-        }:
-            raise ValueError("Gateway listener overlaps fixed local GSV endpoint")
+    def valid_startup_text(self):
         if not self.startup_test.text.strip() or len(self.startup_test.text) > 4096:
             raise ValueError("Invalid startup test text")
         return self
 
+    def backend_files(self) -> tuple[dict[str, str], tuple[str, ...]]:
+        """Additional writable state and read-only source paths, respectively."""
+        return {}, ()
+
 
 class Engine(Model):
-    id: Literal["gpt-sovits"] = "gpt-sovits"
-    created: StrictInt = Field(default=1794009600, ge=0)
+    id: StrictStr = Field(min_length=1, max_length=128)
+    created: StrictInt = Field(default=0, ge=0)
     owned_by: StrictStr = "local"
 
 
@@ -199,31 +183,24 @@ class Voice(Model):
     declared_languages: list[StrictStr] = Field(min_length=1)
     backend_options: dict
 
-    def public(self):
-        return self.model_dump(exclude={"backend_options"}) | {"streaming": "segmented"}
+    def public(self, streaming: str):
+        return self.model_dump(exclude={"backend_options"}) | {"streaming": streaming}
 
 
 class VoiceRegistry(Model):
     schema_version: Literal[1] = 1
-    backend_type: Literal["gpt_sovits"] = "gpt_sovits"
-    engine: Engine = Field(default_factory=Engine)
-    assets_root: StrictStr
+    backend_type: StrictStr
+    engine: Engine
     voices: list[Voice] = Field(min_length=1)
 
     @model_validator(mode="after")
     def identifiers(self):
         seen = set()
-        prompts = {}
         for voice in self.voices:
             for alias in [voice.id, *voice.aliases]:
                 if not alias.strip() or alias in seen:
                     raise ValueError("Voice ID/alias must be globally unique")
                 seen.add(alias)
-            options = voice.backend_options
-            text, lang = options.get("prompt_text"), options.get("prompt_lang")
-            if text in prompts and prompts[text] != lang:
-                raise ValueError("GSV prompt language cache conflict")
-            prompts[text] = lang
         return self
 
     def find(self, value: str) -> Voice:
@@ -254,20 +231,41 @@ def fingerprint(path: Path) -> str:
     return digest.hexdigest()
 
 
+def load_gateway_config(path, overrides=None):
+    from .backends import DEFAULT_BACKEND, get_registration
+
+    raw = jsonc.load(path)
+    if not isinstance(raw, dict):
+        raise ValueError("Gateway configuration must be an object")
+    for key, value in (overrides or {}).items():
+        section, field = key.split(".", 1)
+        raw.setdefault(section, {})[field] = value
+    backend = raw.get("backend", {})
+    name = backend.get("type", DEFAULT_BACKEND) if isinstance(backend, dict) else DEFAULT_BACKEND
+    registration = get_registration(name)
+    return registration.gateway_config.model_validate(raw), registration
+
+
+def load_voice_registry(path, registration, backend_type):
+    registry = registration.voice_registry.model_validate(jsonc.load(path))
+    if registry.backend_type != backend_type:
+        raise ValueError("Voice registry backend_type must match backend.type")
+    return registry
+
+
+def same_path(first, second):
+    return first == second or first.exists() and second.exists() and os.path.samefile(first, second)
+
+
 class LoadedConfig:
     def __init__(self, path: Path, overrides: dict | None = None, runtime_root: Path | None = None):
         self.path = path.resolve(strict=True)
         self.base = self.path.parent
         self.overrides = dict(overrides or {})
-        raw = jsonc.load(self.path)
-        for key, value in self.overrides.items():
-            section, field = key.split(".", 1)
-            raw.setdefault(section, {})[field] = value
-        self.value = GatewayConfig.model_validate(raw)
+        self.value, self.backend_registration = load_gateway_config(self.path, self.overrides)
         self.runtime_root = (runtime_root or Path(__file__).resolve().parent.parent / "runtime").resolve()
         self.voices_path = self.resolve(self.value.voices_file)
-        self.registry = VoiceRegistry.model_validate(jsonc.load(self.voices_path))
-        self.assets_root = resolve_path(self.voices_path.parent, self.registry.assets_root)
+        self.registry = load_voice_registry(self.voices_path, self.backend_registration, self.value.backend.type)
         self.registry_digest = fingerprint(self.voices_path)
         self.instance_id = instance_id(self.path)
         effective = self.value.model_dump() | {
@@ -279,30 +277,30 @@ class LoadedConfig:
         if self.registry.find(self.value.startup_test.voice).id != self.value.startup_test.voice:
             raise ValueError("Startup voice must use its canonical ID")
         self.state_dir = self.resolve(self.value.runtime_dir)
-        self.snapshot_path = self.resolve(self.value.backend.last_good_config)
-        self.working_path = self.resolve(self.value.backend.auto.runtime_config)
+        snapshot = self.value.backend.last_good_config
+        self.snapshot_path = (
+            self.resolve(snapshot)
+            if snapshot is not None
+            else self.state_dir / "backend" / f"{self.value.backend.type}-last-good.yaml"
+        ).resolve()
         self.token_path = self.resolve(self.value.auth.token_file)
-        protected = [self.path, self.voices_path, self.token_path]
-        if self.value.backend.auto.config_template:
-            protected.append(self.resolve(self.value.backend.auto.config_template))
-        same_file = (
-            self.snapshot_path.exists()
-            and self.working_path.exists()
-            and os.path.samefile(self.snapshot_path, self.working_path)
-        )
-        aliases_protected = any(
-            p == target or p.exists() and target.exists() and os.path.samefile(p, target)
-            for p in [self.snapshot_path, self.working_path]
-            for target in protected
-        )
-        if self.snapshot_path == self.working_path or same_file or aliases_protected:
+        writable, sources = self.value.backend_files()
+        self.backend_paths = {name: self.resolve(path) for name, path in writable.items()}
+        private_paths = [self.snapshot_path, *self.backend_paths.values()]
+        protected = [self.path, self.voices_path, self.token_path, *(self.resolve(path) for path in sources)]
+        if any(same_path(a, b) for a, b in combinations(private_paths, 2)) or any(
+            same_path(path, target) for path in private_paths for target in protected
+        ):
             raise ValueError("Private backend files must be separate from source/config/token files")
-        for p in [self.snapshot_path, self.working_path, self.resolve(self.value.logging.directory)]:
+        for p in [*private_paths, self.resolve(self.value.logging.directory)]:
             if not p.is_relative_to(self.state_dir):
                 raise ValueError("Backend state and logs must be inside the private runtime_dir")
 
     def resolve(self, value: str) -> Path:
         return resolve_path(self.base, value)
+
+    def public_voices(self) -> list[dict]:
+        return [voice.public(self.backend_registration.streaming) for voice in self.registry.voices]
 
     def read_tokens(self) -> tuple[bytes, ...]:
         from .security import require_private
@@ -340,37 +338,6 @@ class LoadedConfig:
     def assert_registry_unchanged(self):
         if fingerprint(self.voices_path) != self.registry_digest:
             raise ValueError("Voice registry changed; restart required")
-
-
-class GSVOptions(Model):
-    gpt_weights: StrictStr
-    sovits_weights: StrictStr
-    ref_audio_path: StrictStr
-    prompt_text: StrictStr = Field(min_length=1)
-    prompt_lang: StrictStr
-    text_lang: StrictStr
-    expected_sample_rate: StrictInt = Field(gt=0, le=192000)
-
-
-def validate_gsv_assets(config: LoadedConfig, voice: Voice) -> tuple[GSVOptions, dict, dict]:
-    options = GSVOptions.model_validate(voice.backend_options)
-    paths = {
-        k: resolve_path(config.assets_root, getattr(options, k))
-        for k in ("gpt_weights", "sovits_weights", "ref_audio_path")
-    }
-    for path in paths.values():
-        if not path.is_file():
-            raise ValueError("Voice asset missing")
-    stamps = {key: asset_stamp(path) for key, path in paths.items()}
-    with wave.open(str(paths["ref_audio_path"]), "rb") as wav:
-        duration = wav.getnframes() / wav.getframerate()
-        if not 3 <= duration <= 10:
-            raise ValueError("Reference audio must be 3–10 seconds")
-    values = options.model_dump() | {k: str(v) for k, v in paths.items()}
-    digests = {k: fingerprint(p) for k, p in paths.items()}
-    if any(asset_stamp(path) != stamps[key] for key, path in paths.items()):
-        raise ValueError("Voice asset changed during validation")
-    return GSVOptions.model_validate(values), digests, stamps
 
 
 def asset_stamp(path):

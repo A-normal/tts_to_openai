@@ -73,6 +73,9 @@ def foreground_pipeline(config, executable):
 
 
 class FakeAdapter:
+    reservation_key = "backend-test-only"
+    endpoint_label = "Test endpoint"
+
     def __init__(self, config):
         self.config = config
         self.state = "unknown_clean"
@@ -83,7 +86,7 @@ class FakeAdapter:
         self.fail = None
 
     def describe(self):
-        return {"id": "gpt-sovits", "object": "model", "created": 1794009600, "owned_by": "local"}
+        return self.config.registry.engine.model_dump() | {"object": "model"}
 
     def validate(self):
         pass
@@ -130,7 +133,7 @@ class FakeAdapter:
             "schema_version": 1,
             "voice": voice.id,
             "registry_sha256": self.config.registry_digest,
-            "backend_type": "test-only",
+            "backend_type": self.config.value.backend.type,
             "backend_payload": {"no_gsv_paths": True},
         }
 

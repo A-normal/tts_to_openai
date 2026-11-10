@@ -11,6 +11,8 @@ FFmpeg 和 FFprobe 的显式相对路径以主配置所在目录为基准。只�
 
 PATH 上的 Python 版本兼容但缺少锁定依赖时，`setup` 可以用它创建 `runtime/venv-path`，依赖安装在虚拟环境中。PATH 上没有兼容解释器时，`setup` 使用 `runtime/python` 下的受管解释器准备 `runtime/venv`。普通启动只选择可用环境，缺项时提示显式执行 `setup`。`-Online` 允许获取缺失的归档和依赖。
 
+运行中的网关会共享持有其工具目录下的 `.runtime.lock`。`setup` 修复前独占该文件，仍应先停止使用同一工具目录的网关。锁随进程关闭释放，文件可保留。
+
 PowerShell 入口会为网关临时隔离 `PYTHONHOME`、`PYTHONPATH` 和用户级 site-packages。手工运行 `python -m gsv_gateway` 时，解释器由当前 shell 解析。
 
 在项目根目录运行以下命令，查看 `PYTHON.executable`、`PYTHON.base_executable`、`AUDIO_TOOLS.paths` 和 `AUDIO_TOOLS.versions`，以确认虚拟环境、基础解释器和音频工具。

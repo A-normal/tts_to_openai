@@ -56,6 +56,24 @@ class Mutex:
             self.handle = None
 
 
+def open_runtime_lease(root: Path):
+    """Allow other gateways to read this runtime while excluding setup writes."""
+    require_windows()
+    import win32con
+    import win32file
+
+    root.mkdir(parents=True, exist_ok=True)
+    return win32file.CreateFile(
+        str(root / ".runtime.lock"),
+        win32con.GENERIC_READ,
+        win32con.FILE_SHARE_READ,
+        None,
+        win32con.OPEN_ALWAYS,
+        win32con.FILE_ATTRIBUTE_NORMAL,
+        None,
+    )
+
+
 class ManagedProcess:
     """Create suspended, assign a kill-on-close Job, then allow user code to execute.
 

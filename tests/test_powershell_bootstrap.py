@@ -8,6 +8,7 @@ import pytest
 
 from gsv_gateway.config import TokenFile
 from gsv_gateway.security import require_private
+from gsv_gateway.windows import open_runtime_lease
 
 
 @pytest.mark.skipif(os.name != "nt", reason="Windows PowerShell 5.1")
@@ -69,3 +70,30 @@ def test_setup_token_initialization_is_private_and_idempotent(tmp_path):
     subprocess.run(command, env=env, capture_output=True, check=True, timeout=15)
     assert path.read_bytes() == before
     assert list(directory.iterdir()) == [path]
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows shared runtime lease")
+def test_powershell_setup_excludes_active_runtime_readers(tmp_path):
+    source = Path(__file__).resolve().parents[1] / "scripts" / "common.ps1"
+    env = os.environ | {"GATEWAY_TEST_COMMON": str(source), "GATEWAY_TEST_RUNTIME": str(tmp_path)}
+    executable = Path(env["SYSTEMROOT"]) / "System32/WindowsPowerShell/v1.0/powershell.exe"
+    command = [
+        str(executable),
+        "-NoProfile",
+        "-NonInteractive",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-Command",
+        ". $env:GATEWAY_TEST_COMMON; $lease = Open-RuntimeRepairLease $env:GATEWAY_TEST_RUNTIME; $lease.Dispose()",
+    ]
+    first = open_runtime_lease(tmp_path)
+    try:
+        second = open_runtime_lease(tmp_path)
+        try:
+            blocked = subprocess.run(command, env=env, capture_output=True, timeout=15)
+            assert blocked.returncode != 0 and b"Cannot lock the shared runtime" in blocked.stderr
+        finally:
+            second.Close()
+    finally:
+        first.Close()
+    subprocess.run(command, env=env, capture_output=True, check=True, timeout=15)

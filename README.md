@@ -145,6 +145,8 @@ with client.audio.speech.with_streaming_response.create(
 
 ## 开发检查
 
+开发本地 TTS 后端可参考 [后端接入指南](docs/backend-adapter.md)，其中包括配置注册、音频会话、故障语义和测试方式。
+
 以下以 PATH Python 创建的虚拟环境为例。使用受管 Python 时，将 `venv-path` 换成 `venv`。
 
 ```powershell

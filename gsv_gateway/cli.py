@@ -22,9 +22,7 @@ from .windows import (
 
 
 def parser():
-    result = argparse.ArgumentParser(
-        description="Local OpenAI Speech gateway (GSV backend on 127.0.0.1:9880)"
-    )
+    result = argparse.ArgumentParser(description="Local OpenAI Speech gateway")
     commands = result.add_subparsers(dest="command", required=True)
     for name in ("run", "start", "stop", "restart", "status", "voices", "doctor", "check-config"):
         sub = commands.add_parser(name)
@@ -86,8 +84,8 @@ _STARTUP_MESSAGES = {
     "environment": "Checking the Python environment and audio tools",
     "voice_assets": "Validating voice assets",
     "snapshot_selection": "Selecting the startup voice",
-    "backend_probe": "Checking the GPT-SoVITS endpoint",
-    "backend_launch": "Waiting for managed GPT-SoVITS to start",
+    "backend_probe": "Checking the configured TTS endpoint",
+    "backend_launch": "Waiting for the managed TTS backend to start",
     "startup_self_test": "Running the FLAC synthesis and decode self-test",
 }
 
@@ -315,7 +313,7 @@ def main(argv=None):
         if args.command == "voices":
             print(
                 json.dumps(
-                    {"voices": [v.public() for v in config.registry.voices]}, ensure_ascii=False, indent=2
+                    {"voices": config.public_voices()}, ensure_ascii=False, indent=2
                 )
             )
             return 0

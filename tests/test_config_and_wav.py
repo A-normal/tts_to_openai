@@ -4,7 +4,8 @@ import struct
 import pytest
 from pydantic import ValidationError
 
-from gsv_gateway.config import GatewayConfig, LoadedConfig, VoiceRegistry
+from gsv_gateway.backends.gsv_config import GSVGatewayConfig, GSVVoiceRegistry
+from gsv_gateway.config import LoadedConfig
 from gsv_gateway.jsonc import loads
 from gsv_gateway.wav import WAVParser
 
@@ -24,19 +25,19 @@ def test_jsonc_rejects_ambiguous_inputs(source):
 
 
 def test_mode_defaults_and_removed_fields():
-    config = GatewayConfig.model_validate({"startup_test": {"voice": "a"}})
+    config = GSVGatewayConfig.model_validate({"startup_test": {"voice": "a"}})
     assert config.timeouts.first_audio_seconds == 180
     assert config.timeouts.first_encoded_audio_seconds == 30
     assert config.server.max_concurrent_requests == 32
     for removed in ({"connect_url": "http://remote"}, {"auto": {"port": 16680}}):
         with pytest.raises(ValidationError):
-            GatewayConfig.model_validate({"startup_test": {"voice": "a"}, "backend": removed})
+            GSVGatewayConfig.model_validate({"startup_test": {"voice": "a"}, "backend": removed})
 
 
 @pytest.mark.parametrize("field,value", [("exclusive", 1), ("exclusive", "true")])
 def test_boolean_config_constants_are_strict(field, value):
     with pytest.raises(ValidationError):
-        GatewayConfig.model_validate({"startup_test": {"voice": "a"}, "backend": {field: value}})
+        GSVGatewayConfig.model_validate({"startup_test": {"voice": "a"}, "backend": {field: value}})
 
 
 @pytest.mark.parametrize(
@@ -50,7 +51,7 @@ def test_boolean_config_constants_are_strict(field, value):
 )
 def test_config_rejects_invalid_contract(changes):
     with pytest.raises(ValidationError):
-        GatewayConfig.model_validate({"startup_test": {"voice": "a"}} | changes)
+        GSVGatewayConfig.model_validate({"startup_test": {"voice": "a"}} | changes)
 
 
 def test_relative_paths_ignore_cwd(config, tmp_path, monkeypatch):
@@ -72,7 +73,7 @@ def test_alias_conflicts(config):
     data = config.registry.model_dump()
     data["voices"][1]["aliases"] = ["a"]
     with pytest.raises(ValidationError):
-        VoiceRegistry.model_validate(data)
+        GSVVoiceRegistry.model_validate(data)
 
 
 def wav_header(rate=48000):

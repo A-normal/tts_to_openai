@@ -130,45 +130,6 @@
       "title": "Auto",
       "type": "object"
     },
-    "Backend": {
-      "additionalProperties": false,
-      "properties": {
-        "type": {
-          "const": "gpt_sovits",
-          "default": "gpt_sovits",
-          "title": "Type",
-          "type": "string"
-        },
-        "mode": {
-          "default": "auto",
-          "enum": [
-            "connect",
-            "auto"
-          ],
-          "title": "Mode",
-          "type": "string"
-        },
-        "exclusive": {
-          "const": true,
-          "default": true,
-          "title": "Exclusive",
-          "type": "boolean"
-        },
-        "auto": {
-          "$ref": "#/$defs/Auto"
-        },
-        "recovery": {
-          "$ref": "#/$defs/Recovery"
-        },
-        "last_good_config": {
-          "default": "data/backend/last-good.yaml",
-          "title": "Last Good Config",
-          "type": "string"
-        }
-      },
-      "title": "Backend",
-      "type": "object"
-    },
     "Control": {
       "additionalProperties": false,
       "properties": {
@@ -188,6 +149,45 @@
         }
       },
       "title": "Control",
+      "type": "object"
+    },
+    "GSVBackend": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "gpt_sovits",
+          "default": "gpt_sovits",
+          "title": "Type",
+          "type": "string"
+        },
+        "mode": {
+          "default": "auto",
+          "enum": [
+            "connect",
+            "auto"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "recovery": {
+          "$ref": "#/$defs/Recovery"
+        },
+        "last_good_config": {
+          "default": "data/backend/last-good.yaml",
+          "title": "Last Good Config",
+          "type": "string"
+        },
+        "exclusive": {
+          "const": true,
+          "default": true,
+          "title": "Exclusive",
+          "type": "boolean"
+        },
+        "auto": {
+          "$ref": "#/$defs/Auto"
+        }
+      },
+      "title": "GSVBackend",
       "type": "object"
     },
     "Inference": {
@@ -477,7 +477,7 @@
       "type": "string"
     },
     "backend": {
-      "$ref": "#/$defs/Backend"
+      "$ref": "#/$defs/GSVBackend"
     },
     "queue": {
       "$ref": "#/$defs/Queue"
@@ -488,9 +488,6 @@
     "audio": {
       "$ref": "#/$defs/Audio"
     },
-    "inference": {
-      "$ref": "#/$defs/Inference"
-    },
     "logging": {
       "$ref": "#/$defs/Logging"
     },
@@ -499,11 +496,14 @@
     },
     "control": {
       "$ref": "#/$defs/Control"
+    },
+    "inference": {
+      "$ref": "#/$defs/Inference"
     }
   },
   "required": [
     "startup_test"
   ],
-  "title": "GatewayConfig",
+  "title": "GSVGatewayConfig",
   "type": "object"
 }

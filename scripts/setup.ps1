@@ -3,16 +3,18 @@ param([switch]$Online, [switch]$Dev, [switch]$InitConfig)
 $root=Get-ProjectRoot
 $runtime=Join-Path $root 'runtime'
 $manifestPath=Join-Path $root 'runtime-manifest.json'
+# During upgrades, older running GSV gateways still hold only this mutex.
 $created=$false
 $mutex=New-Object Threading.Mutex($true, 'Global\GSVGateway-backend-gpt-sovits-127.0.0.1-9880', [ref]$created)
 if (-not $created) { $mutex.Dispose(); throw 'Stop all gateway instances before repairing the shared runtime.' }
 $names=@('UV_PYTHON_INSTALL_DIR','UV_CACHE_DIR','UV_PROJECT_ENVIRONMENT','UV_PYTHON_INSTALL_BIN','UV_PYTHON_INSTALL_REGISTRY','UV_OFFLINE','UV_NO_CONFIG','UV_PYTHON_INSTALL_MIRROR','UV_PYTHON_DOWNLOADS_JSON_URL','PYTHONHOME','PYTHONPATH','PYTHONNOUSERSITE')
 $prior=@{};foreach($name in $names){$prior[$name]=[Environment]::GetEnvironmentVariable($name,'Process')}
 $location=Get-Location
+$runtimeLease=$null
 try {
     if (-not (Test-Path -LiteralPath $manifestPath)) { throw 'Locked runtime-manifest.json is required.' }
     $manifest=Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
-    [IO.Directory]::CreateDirectory($runtime) | Out-Null
+    $runtimeLease=Open-RuntimeRepairLease $runtime
     [IO.File]::WriteAllText((Join-Path $runtime 'installing.json'), '{"status":"incomplete"}')
     $env:UV_PYTHON_INSTALL_DIR=Join-Path $runtime 'python'
     $env:UV_CACHE_DIR=Join-Path $runtime 'cache\uv'
@@ -80,5 +82,6 @@ try {
 } finally {
     foreach($name in $names){[Environment]::SetEnvironmentVariable($name,$prior[$name],'Process')}
     Set-Location -LiteralPath $location
+    if ($runtimeLease) { $runtimeLease.Dispose() }
     $mutex.ReleaseMutex();$mutex.Dispose()
 }

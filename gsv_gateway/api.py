@@ -247,7 +247,7 @@ def create_app(service):
 
     @app.get("/voices")
     async def voices():
-        return {"voices": [voice.public() for voice in service.config.registry.voices]}
+        return {"voices": service.config.public_voices()}
 
     @app.get("/health/live")
     async def live():

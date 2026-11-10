@@ -29,6 +29,16 @@ class SnapshotStore:
         self.config, self.adapter = config, adapter
         self.current = None
 
+    def candidate(self, voice):
+        data = self.adapter.snapshot(voice)
+        if (
+            data.get("voice") != voice.id
+            or data.get("backend_type") != self.config.value.backend.type
+            or data.get("registry_sha256") != self.config.registry_digest
+        ):
+            raise ValueError("Snapshot must identify the current backend, registry and voice")
+        return data
+
     def select(self):
         path = self.config.snapshot_path
         if not path.exists():
@@ -39,7 +49,7 @@ class SnapshotStore:
         data = yaml.safe_load(path.read_text(encoding="utf-8"))
         try:
             voice = self.config.registry.find(data["voice"])
-            expected = self.adapter.snapshot(voice)
+            expected = self.candidate(voice)
             if data != expected:
                 raise ValueError()
         except (KeyError, TypeError, ValueError):
@@ -50,7 +60,7 @@ class SnapshotStore:
         return voice, "last_good"
 
     def commit(self, voice):
-        candidate = self.adapter.snapshot(voice)
+        candidate = self.candidate(voice)
         if candidate != self.current:
             atomic_write(
                 self.config.snapshot_path, yaml.safe_dump(candidate, allow_unicode=True).encode("utf-8")

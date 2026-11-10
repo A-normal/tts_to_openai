@@ -1,6 +1,6 @@
 {
   "$defs": {
-    "Engine": {
+    "GSVEngine": {
       "additionalProperties": false,
       "properties": {
         "id": {
@@ -21,7 +21,7 @@
           "type": "string"
         }
       },
-      "title": "Engine",
+      "title": "GSVEngine",
       "type": "object"
     },
     "Voice": {
@@ -128,11 +128,7 @@
       "type": "string"
     },
     "engine": {
-      "$ref": "#/$defs/Engine"
-    },
-    "assets_root": {
-      "title": "Assets Root",
-      "type": "string"
+      "$ref": "#/$defs/GSVEngine"
     },
     "voices": {
       "items": {
@@ -141,12 +137,16 @@
       "minItems": 1,
       "title": "Voices",
       "type": "array"
+    },
+    "assets_root": {
+      "title": "Assets Root",
+      "type": "string"
     }
   },
   "required": [
-    "assets_root",
-    "voices"
+    "voices",
+    "assets_root"
   ],
-  "title": "VoiceRegistry",
+  "title": "GSVVoiceRegistry",
   "type": "object"
 }

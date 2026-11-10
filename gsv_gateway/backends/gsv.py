@@ -5,17 +5,18 @@ import time
 import httpx
 import yaml
 
-from ..config import asset_stamp, validate_gsv_assets
+from ..config import asset_stamp
 from ..errors import GatewayError
 from ..wav import WAVParser
 from ..windows import LaunchSpec
 from .base import AudioSession
-
-
-ENDPOINT = "http://127.0.0.1:9880"
+from .gsv_config import ENDPOINT, HOST, PORT, TYPE, validate_gsv_assets
 
 
 class GSVAdapter:
+    reservation_key = f"backend-gpt-sovits-{HOST}-{PORT}"
+    endpoint_label = "Fixed loopback GSV endpoint"
+
     def __init__(self, config, transport=None):
         self.config = config
         self.state = "unknown_clean"
@@ -88,7 +89,7 @@ class GSVAdapter:
                 cause = cause.__cause__ or cause.__context__
             with socket.socket() as sock:
                 sock.settimeout(1)
-                return "unreachable" if sock.connect_ex(("127.0.0.1", 9880)) in (10061, 111) else "uncertain"
+                return "unreachable" if sock.connect_ex((HOST, PORT)) in (10061, 111) else "uncertain"
         except (httpx.HTTPError, ValueError):
             return "uncertain"
 
@@ -192,7 +193,7 @@ class GSVAdapter:
         options, digests = self.assets[voice.id]
         return {
             "schema_version": 1,
-            "backend_type": "gpt_sovits",
+            "backend_type": TYPE,
             "voice": voice.id,
             "registry_sha256": self.config.registry_digest,
             "asset_sha256": digests,
@@ -214,9 +215,9 @@ class GSVAdapter:
                 raise ValueError("GSV template missing base configuration")
         from ..storage import atomic_write
 
-        atomic_write(self.config.working_path, yaml.safe_dump(data, allow_unicode=True).encode())
+        atomic_write(self.config.backend_paths["working"], yaml.safe_dump(data, allow_unicode=True).encode())
 
-    def build_launch_spec(self, voice):
+    def _launch_paths(self):
         auto = self.config.value.backend.auto
         executable = self.config.resolve(auto.python_executable)
         cwd = self.config.resolve(auto.working_directory)
@@ -231,11 +232,21 @@ class GSVAdapter:
         script = (cwd / args[0]).resolve()
         if not executable.is_file() or not script.is_file():
             raise ValueError("GSV executable/script missing")
+        if not cwd.is_dir() or not self.config.resolve(auto.config_template).is_file():
+            raise ValueError("GSV working directory/template missing")
         self.validate_default_port(script)
+        return executable, cwd, script
+
+    def validate_launch(self):
+        self._launch_paths()
+
+    def build_launch_spec(self, voice):
+        executable, cwd, script = self._launch_paths()
         self.stage_working_config(voice)
+        working = self.config.backend_paths["working"]
         return LaunchSpec(
             str(executable),
-            ["-I", str(script), "-a", "127.0.0.1", "-c", str(self.config.working_path)],
+            ["-I", str(script), "-a", HOST, "-c", str(working)],
             str(cwd),
         )
 
@@ -255,7 +266,7 @@ class GSVAdapter:
                     default = next(
                         (keyword.value for keyword in node.keywords if keyword.arg == "default"), None
                     )
-                    if isinstance(default, ast.Constant) and int(default.value) == 9880:
+                    if isinstance(default, ast.Constant) and int(default.value) == PORT:
                         return
         raise ValueError("GSV API default port changed or cannot be verified; revalidate backend version")
 

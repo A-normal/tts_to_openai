@@ -78,7 +78,7 @@ def test_start_displays_verified_progress_and_keeps_ready_on_stdout(startup, mon
     assert [line.split(" (")[0] for line in output.err.splitlines()] == [
         "[gateway] Launching the gateway process",
         "[gateway] Waiting for the gateway control channel",
-        "[gateway] Waiting for managed GPT-SoVITS to start",
+        "[gateway] Waiting for the managed TTS backend to start",
         "[gateway] Running the FLAC synthesis and decode self-test",
         "[gateway] Gateway ready",
     ]

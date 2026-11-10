@@ -15,7 +15,7 @@ from .errors import GatewayError
 from .scheduler import Scheduler
 from .security import secure_path
 from .storage import SnapshotStore
-from .windows import ManagedProcess, Mutex
+from .windows import ManagedProcess, Mutex, open_runtime_lease
 
 
 class GatewayService:
@@ -33,6 +33,7 @@ class GatewayService:
         self.store = SnapshotStore(config, self.adapter)
         self.ffmpeg = self.ffprobe = None
         self.mutexes = []
+        self.runtime_lease = None
         self.logger = None
 
     def log(self, code, **values):
@@ -113,7 +114,8 @@ class GatewayService:
 
     def reserve(self):
         self.mutexes.append(Mutex("instance-" + self.config.instance_id))
-        self.mutexes.append(Mutex("backend-gpt-sovits-127.0.0.1-9880"))
+        self.mutexes.append(Mutex(self.adapter.reservation_key))
+        self.runtime_lease = open_runtime_lease(self.config.runtime_root)
 
     async def launch_backend(self, voice, deadline):
         if self.backend_process is not None:
@@ -274,6 +276,9 @@ class GatewayService:
         for mutex in reversed(self.mutexes):
             mutex.close()
         self.mutexes.clear()
+        if self.runtime_lease is not None:
+            self.runtime_lease.Close()
+            self.runtime_lease = None
         if self.logger:
             for handler in self.logger.handlers:
                 handler.close()

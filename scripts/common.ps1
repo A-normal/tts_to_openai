@@ -3,6 +3,15 @@ $ErrorActionPreference = 'Stop'
 
 function Get-ProjectRoot { return [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..')) }
 
+function Open-RuntimeRepairLease([string]$Runtime) {
+    [IO.Directory]::CreateDirectory($Runtime) | Out-Null
+    try {
+        return [IO.File]::Open((Join-Path $Runtime '.runtime.lock'), 'OpenOrCreate', 'ReadWrite', 'None')
+    } catch [IO.IOException] {
+        throw 'Cannot lock the shared runtime for setup. Stop its gateway instances and retry.'
+    }
+}
+
 function Read-Jsonc([string]$Path) {
     $source = [IO.File]::ReadAllText([IO.Path]::GetFullPath($Path), [Text.Encoding]::UTF8)
     $output = $source.ToCharArray()

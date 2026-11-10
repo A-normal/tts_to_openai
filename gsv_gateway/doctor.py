@@ -5,20 +5,19 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from . import jsonc
 from .audio import select_audio_tools
 from .backends import create_adapter
-from .config import GatewayConfig, LoadedConfig, VoiceRegistry, resolve_path
+from .config import ConfigConstraint, LoadedConfig, load_gateway_config, load_voice_registry, resolve_path
 from .python_probe import supported_python, verify_dependencies
 
 
 _CONFIG_REASONS = {
-    "Voice ID/alias must be globally unique": ("voices", "声音 ID/别名重复，或别名与另一声音 ID 冲突。"),
-    "GSV prompt language cache conflict": ("voices", "相同参考文本配置了不同的参考语言。"),
-    "Gateway listener overlaps fixed local GSV endpoint": (
-        "server.port",
-        "网关监听地址与 GSV 的固定回环 9880 端口冲突。",
+    "Unknown backend type": ("backend.type", "请填写当前源码中已注册的后端类型。"),
+    "Voice registry backend_type must match backend.type": (
+        "backend_type",
+        "声音表的后端类型必须与网关配置匹配。",
     ),
+    "Voice ID/alias must be globally unique": ("voices", "声音 ID/别名重复，或别名与另一声音 ID 冲突。"),
     "Invalid startup test text": ("startup_test.text", "自检文本必须非空且不超过 4096 个 Unicode 码点。"),
     "Recovery delays must cover every attempt": (
         "backend.recovery",
@@ -30,11 +29,11 @@ _CONFIG_REASONS = {
     ),
     "Private backend files must be separate from source/config/token files": (
         "backend",
-        "工作 YAML 和成功快照必须彼此分离，且不能指向原配置或 Token 文件。",
+        "后端工作文件和成功快照必须彼此分离，且不能指向源配置或 Token 文件。",
     ),
     "Backend state and logs must be inside the private runtime_dir": (
         "runtime_dir",
-        "日志、工作 YAML 和成功快照必须位于 runtime_dir 内。",
+        "日志、后端工作文件和成功快照必须位于 runtime_dir 内。",
     ),
     "Boolean is not a numeric configuration constant": (None, "数字配置项不能填写 true/false。"),
     "Boolean configuration constant required": (
@@ -49,7 +48,7 @@ def _config_details(error, path, document):
     base = {"file": str(Path(path).resolve()), "document": document}
     if isinstance(error, ValidationError):
         details = []
-        for item in error.errors(include_input=False, include_url=False, include_context=False)[:20]:
+        for item in error.errors(include_input=False, include_url=False)[:20]:
             field = ".".join(str(part) for part in item["loc"]) or None
             kind = item["type"]
             reason = {
@@ -69,6 +68,9 @@ def _config_details(error, path, document):
                 if item["msg"] == "Value error, " + known:
                     field, reason = location or field, explanation
                     break
+            constraint = item.get("ctx", {}).get("error")
+            if isinstance(constraint, ConfigConstraint):
+                field, reason = constraint.field, str(constraint)
             details.append(base | {"field": field, "error_type": kind, "reason": reason})
         return details
     if isinstance(error, json.JSONDecodeError):
@@ -126,15 +128,10 @@ def load_diagnostic_config(path, overrides=None, runtime_root=None):
     selected = Path(path).resolve()
     document = "gateway"
     try:
-        raw = jsonc.load(selected)
-        for key, value in (overrides or {}).items():
-            section, field = key.split(".", 1)
-            if isinstance(raw, dict):
-                raw.setdefault(section, {})[field] = value
-        gateway = GatewayConfig.model_validate(raw)
+        gateway, registration = load_gateway_config(selected, overrides)
         selected = resolve_path(selected.parent, gateway.voices_file)
         document = "voices"
-        VoiceRegistry.model_validate(jsonc.load(selected))
+        load_voice_registry(selected, registration, gateway.backend.type)
         selected, document = Path(path).resolve(), "gateway"
         config = LoadedConfig(Path(path), overrides, runtime_root)
         return config, []
@@ -198,7 +195,7 @@ async def diagnose(path, overrides=None, runtime_root=None, full=True):
     adapter = create_adapter(config)
     try:
         adapter.validate()
-        row("VOICE_ASSETS", "OK", "All registered assets exist and reference duration is valid")
+        row("VOICE_ASSETS", "OK", "Backend voice configuration and assets valid")
     except Exception:
         row(
             "VOICE_ASSETS",
@@ -227,26 +224,14 @@ async def diagnose(path, overrides=None, runtime_root=None, full=True):
             next_action="scripts/setup.ps1 -Online",
         )
     if config.value.backend.mode == "auto":
-        auto = config.value.backend.auto
         try:
-            cwd = config.resolve(auto.working_directory)
-            if (
-                not config.resolve(auto.python_executable).is_file()
-                or not cwd.is_dir()
-                or not (cwd / "api_v2.py").is_file()
-                or not config.resolve(auto.config_template).is_file()
-            ):
-                raise ValueError()
-            args = [x for x in auto.arguments if x != "-I"]
-            if auto.arguments.count("-I") > 1 or len(args) != 1 or Path(args[0]).name != "api_v2.py":
-                raise ValueError()
-            adapter.validate_default_port(cwd / "api_v2.py")
+            adapter.validate_launch()
             row("AUTO_LAUNCH_CONFIG", "OK", "Owned launch paths valid; no process was started")
         except Exception:
             row("AUTO_LAUNCH_CONFIG", "ERROR", "Invalid auto executable/cwd/template/arguments")
     try:
         probe = await adapter.probe()
-        row("BACKEND_ENDPOINT", "OK" if probe == "ready" else "WARN", "Fixed loopback GSV endpoint: " + probe)
+        row("BACKEND_ENDPOINT", "OK" if probe == "ready" else "WARN", adapter.endpoint_label + ": " + probe)
     finally:
         await adapter.close()
     return {

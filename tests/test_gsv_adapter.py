@@ -134,6 +134,36 @@ def test_default_port_is_statically_checked(tmp_path):
         GSVAdapter.validate_default_port(script)
 
 
+async def test_gsv_owned_launch_validation_and_working_file(config):
+    config = assets(config)
+    raw = json.loads(config.path.read_text(encoding="utf-8"))
+    raw["backend"].update(
+        mode="auto",
+        auto={"python_executable": "fake-python.exe", "working_directory": ".", "config_template": "source.yaml"},
+    )
+    config.path.write_text(json.dumps(raw), encoding="utf-8")
+    (config.base / "fake-python.exe").touch()
+    (config.base / "api_v2.py").write_text("parser.add_argument('--port', default=9880)", encoding="utf-8")
+    template = config.base / "source.yaml"
+    contents = "custom: {device: cpu, is_half: false, bert_base_path: bert, cnhuhbert_base_path: hubert}"
+    template.write_text(contents, encoding="utf-8")
+    config = LoadedConfig(config.path)
+    adapter = GSVAdapter(config)
+    try:
+        adapter.validate()
+        adapter.validate_launch()
+        working = config.backend_paths["working"]
+        assert not working.exists()
+        voice = config.registry.find("a")
+        spec = adapter.build_launch_spec(voice)
+        assert spec.arguments == ["-I", str(config.base / "api_v2.py"), "-a", "127.0.0.1", "-c", str(working)]
+        assert working.is_file() and template.read_text(encoding="utf-8") == contents
+        assert adapter.snapshot(voice)["backend_type"] == "gpt_sovits"
+        assert not config.snapshot_path.exists()
+    finally:
+        await adapter.close()
+
+
 async def test_asset_or_registry_edit_requires_restart_without_backend_calls(config):
     config = assets(config)
     calls = []
